@@ -5,8 +5,7 @@ export const WELCOME_MESSAGE = (firstName: string): string =>
   `📢 برای دسترسی به تمام امکانات، ابتدا در کانال ما عضو شوید:`;
 
 export const MAIN_MENU_MESSAGE = (firstName: string): string =>
-  `👋 *${firstName}* عزیز، خوش آمدید!\n\n` +
-  `از منوی زیر گزینه مورد نظر را انتخاب کنید 👇`;
+  `👋 *${firstName}* عزیز، خوش آمدید!\n\nاز منوی زیر گزینه مورد نظر را انتخاب کنید 👇`;
 
 export const NOT_MEMBER_MESSAGE = (): string =>
   `⚠️ هنوز عضو کانال نشده‌اید.\nلطفاً ابتدا عضو شوید سپس دکمه «✅ عضو شدم» را بزنید.`;
@@ -26,18 +25,11 @@ export const BLOCKED_SUPPORT_SENT = (): string =>
 export const BLOCKED_ONLY_SUPPORT = (): string =>
   `🚫 *دسترسی محدود*\n\nحساب شما مسدود است.\nفقط می‌توانید با پشتیبانی تماس بگیرید.`;
 
-export const MINIMIZE_MENU_MESSAGE = (): string =>
-  `✅ منو بسته شد.\nبرای بازگشت به منو، /start را بزنید یا هر پیامی ارسال کنید.`;
-
-// ── Token ─────────────────────────────────────────────────────────
 export const TOKEN_SECTION_MESSAGE = (): string =>
   `⭐ *افزودن توکن*\n\n` +
   `این بخش برای فعال‌سازی امکانات حرفه‌ای طراحی شده است.\n\n` +
   `🔜 *به زودی:*\n• دسترسی به سرویس‌های پیشرفته\n• امکانات ویژه اعضای توکن‌دار\n\n` +
   `در صورت داشتن توکن، آن را وارد کنید:`;
-
-export const TOKEN_ENTER_PROMPT = (): string =>
-  `🔑 کد توکن دریافتی را وارد کنید:\n_(مثال: SALF-AB12-CD34)_\n\nبرای انصراف 🔙 را بزنید.`;
 
 export const TOKEN_SUCCESS_MESSAGE = (firstName: string): string =>
   `🎉 *تبریک ${firstName} عزیز!*\n\nتوکن شما با موفقیت فعال شد. به امکانات ویژه دسترسی دارید. 🚀`;
@@ -51,7 +43,6 @@ export const TOKEN_ALREADY_USED_MESSAGE = (): string =>
 export const TOKEN_CREATED_MESSAGE = (code: string): string =>
   `🔑 *توکن جدید ساخته شد*\n\n\`${code}\`\n\n⚠️ هر توکن فقط یک بار قابل استفاده است.`;
 
-// ── Wallet ────────────────────────────────────────────────────────
 export const WALLET_MESSAGE = (balance: number): string =>
   `💰 *کیف پول*\n\nموجودی: *${balance.toLocaleString("fa-IR")} تومان*\n\nیک گزینه را انتخاب کنید:`;
 
@@ -112,7 +103,6 @@ export const PROFILE_MESSAGE = (user: UserRecord): string =>
   `💰 موجودی: *${user.balance.toLocaleString("fa-IR")} تومان*\n` +
   `👥 زیرمجموعه: *${user.referralCount}* نفر`;
 
-// ── Admin ─────────────────────────────────────────────────────────
 export const STATS_MESSAGE = (users: number, tokens: number, unused: number): string =>
   `📊 *آمار ربات*\n\n👥 کاربران: *${users}* نفر\n🔑 توکن صادر شده: *${tokens}*\n✅ توکن باقی‌مانده: *${unused}*`;
 
