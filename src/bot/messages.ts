@@ -20,16 +20,20 @@ export const ADMIN_MANAGE_MESSAGE = (): string =>
 export const SUPPORT_MESSAGE = (): string =>
   `📞 *پشتیبانی*\n\nپیام خود را ارسال کنید.\nکارشناسان در اسرع وقت پاسخ می‌دهند. 🙏`;
 
-export const BLOCKED_SUPPORT_MESSAGE = (): string =>
-  `📞 *پشتیبانی*\n\nحساب شما مسدود است.\nپیام خود را ارسال کنید تا بررسی شود. 🙏`;
+export const BLOCKED_SUPPORT_SENT = (): string =>
+  `📨 *پیام شما ارسال شد*\n\nپیام شما به پشتیبانی ارسال شد.\nمنتظر پاسخ باشید. 🙏`;
+
+export const BLOCKED_ONLY_SUPPORT = (): string =>
+  `🚫 *دسترسی محدود*\n\nحساب شما مسدود است.\nفقط می‌توانید با پشتیبانی تماس بگیرید.`;
+
+export const MINIMIZE_MENU_MESSAGE = (): string =>
+  `✅ منو بسته شد.\nبرای بازگشت به منو، /start را بزنید یا هر پیامی ارسال کنید.`;
 
 // ── Token ─────────────────────────────────────────────────────────
 export const TOKEN_SECTION_MESSAGE = (): string =>
   `⭐ *افزودن توکن*\n\n` +
   `این بخش برای فعال‌سازی امکانات حرفه‌ای طراحی شده است.\n\n` +
-  `🔜 *به زودی:*\n` +
-  `• دسترسی به سرویس‌های پیشرفته\n` +
-  `• امکانات ویژه اعضای توکن‌دار\n\n` +
+  `🔜 *به زودی:*\n• دسترسی به سرویس‌های پیشرفته\n• امکانات ویژه اعضای توکن‌دار\n\n` +
   `در صورت داشتن توکن، آن را وارد کنید:`;
 
 export const TOKEN_ENTER_PROMPT = (): string =>
@@ -52,9 +56,7 @@ export const WALLET_MESSAGE = (balance: number): string =>
   `💰 *کیف پول*\n\nموجودی: *${balance.toLocaleString("fa-IR")} تومان*\n\nیک گزینه را انتخاب کنید:`;
 
 export const ADD_BALANCE_AMOUNT_PROMPT = (): string =>
-  `➕ *افزایش موجودی*\n\n` +
-  `مقدار واریز را *بر حسب تومان* وارد کنید:\n` +
-  `_(مثال: 50000)_\n\nبرای انصراف 🔙 را بزنید.`;
+  `➕ *افزایش موجودی*\n\nمقدار واریز را *بر حسب تومان* وارد کنید:\n_(مثال: 50000)_\n\nبرای انصراف 🔙 را بزنید.`;
 
 export const ADD_BALANCE_RECEIPT = (receiptId: string, amount: number, cardNumber: string): string =>
   `🧾 *رسید واریز*\n\n` +
@@ -81,16 +83,10 @@ export const BLOCKED_MESSAGE = (): string =>
   `تنها دسترسی به پشتیبانی امکان‌پذیر است تا زمانی که ادمین حساب شما را آزاد کند.`;
 
 export const UNBLOCKED_MESSAGE = (): string =>
-  `✅ *حساب شما آزاد شد*\n\n` +
-  `محدودیت حساب شما برداشته شده است.\n` +
-  `می‌توانید مجدداً از تمام خدمات استفاده کنید.`;
-
-export const BLOCKED_ONLY_SUPPORT = (): string =>
-  `🚫 *دسترسی محدود*\n\nحساب شما مسدود است.\nفقط می‌توانید با پشتیبانی تماس بگیرید.`;
+  `✅ *حساب شما آزاد شد*\n\nمحدودیت حساب شما برداشته شده است.\nمی‌توانید مجدداً از تمام خدمات استفاده کنید.`;
 
 export const TRANSFER_PROMPT = (): string =>
-  `💸 *انتقال اعتبار*\n\nشناسه کاربر مقصد و مبلغ را وارد کنید:\n` +
-  `\`[شناسه کاربر] [مبلغ]\`\n\nمثال: \`123456789 5000\`\n\nبرای انصراف 🔙 را بزنید.`;
+  `💸 *انتقال اعتبار*\n\nشناسه کاربر مقصد و مبلغ را وارد کنید:\n\`[شناسه کاربر] [مبلغ]\`\n\nمثال: \`123456789 5000\`\n\nبرای انصراف 🔙 را بزنید.`;
 
 export const TRANSFER_SUCCESS = (toUserId: number, amount: number): string =>
   `✅ *انتقال موفق*\n\n*${amount.toLocaleString("fa-IR")} تومان* به کاربر \`${toUserId}\` منتقل شد.`;
@@ -102,14 +98,11 @@ export const TRANSFER_FAILED = (reason: string): string => ({
   invalid_amount:       "❌ مبلغ باید عدد مثبت باشد.",
 }[reason] ?? "❌ خطا در انتقال. دوباره امتحان کنید.");
 
-// ── Referral ──────────────────────────────────────────────────────
 export const REFERRAL_MESSAGE = (user: UserRecord, botUsername: string): string =>
   `👥 *زیر مجموعه گیری*\n\n` +
   `🔗 لینک دعوت شما:\n\`https://t.me/${botUsername}?start=${user.referralCode}\`\n\n` +
-  `👤 تعداد زیرمجموعه: *${user.referralCount}* نفر\n\n` +
-  `این لینک را به دوستان خود ارسال کنید.`;
+  `👤 تعداد زیرمجموعه: *${user.referralCount}* نفر\n\nاین لینک را به دوستان خود ارسال کنید.`;
 
-// ── Profile ───────────────────────────────────────────────────────
 export const PROFILE_MESSAGE = (user: UserRecord): string =>
   `👤 *پروفایل*\n\n` +
   `🆔 شناسه: \`${user.id}\`\n` +
@@ -121,10 +114,7 @@ export const PROFILE_MESSAGE = (user: UserRecord): string =>
 
 // ── Admin ─────────────────────────────────────────────────────────
 export const STATS_MESSAGE = (users: number, tokens: number, unused: number): string =>
-  `📊 *آمار ربات*\n\n` +
-  `👥 کاربران: *${users}* نفر\n` +
-  `🔑 توکن صادر شده: *${tokens}*\n` +
-  `✅ توکن باقی‌مانده: *${unused}*`;
+  `📊 *آمار ربات*\n\n👥 کاربران: *${users}* نفر\n🔑 توکن صادر شده: *${tokens}*\n✅ توکن باقی‌مانده: *${unused}*`;
 
 export const BROADCAST_PROMPT = (): string =>
   `📢 *ارسال پیام همگانی*\n\nپیام را ارسال کنید:\n\nبرای انصراف 🔙 را بزنید.`;
@@ -138,6 +128,16 @@ export const CARD_NUMBER_PROMPT = (): string =>
 export const CARD_NUMBER_SET = (card: string): string =>
   `✅ شماره کارت ذخیره شد:\n\`${card}\``;
 
+export const BLOCKED_LIST_MESSAGE = (
+  blockedUsers: Array<{ id: number; firstName: string; username?: string }>
+): string => {
+  if (blockedUsers.length === 0) return `✅ هیچ کاربر مسدودی وجود ندارد.`;
+  const lines = blockedUsers.map((u, i) =>
+    `${i + 1}. *${u.firstName}*${u.username ? ` (@${u.username})` : ""} — \`${u.id}\``
+  );
+  return `🚫 *لیست کاربران مسدود* (${blockedUsers.length} نفر)\n\n${lines.join("\n")}\n\nبرای آزادسازی روی دکمه زیر هر کاربر کلیک کنید:`;
+};
+
 export const ADMIN_DEPOSIT_REVIEW = (
   requestId: string, amount: number, userId: number, firstName: string, username?: string
 ): string =>
@@ -145,8 +145,15 @@ export const ADMIN_DEPOSIT_REVIEW = (
   `🆔 شناسه: \`${requestId}\`\n` +
   `👤 کاربر: *${firstName}*${username ? ` (@${username})` : ""}\n` +
   `🔢 آیدی: \`${userId}\`\n` +
-  `💵 مبلغ: *${amount.toLocaleString("fa-IR")} تومان*\n\n` +
-  `رسید واریز را بالا مشاهده کنید. یک گزینه انتخاب کنید:`;
+  `💵 مبلغ: *${amount.toLocaleString("fa-IR")} تومان*\n\nرسید واریز را بالا مشاهده کنید:`;
+
+export const ADMIN_SUPPORT_FROM_BLOCKED = (
+  userId: number, firstName: string, username: string | undefined, text: string
+): string =>
+  `📞 *پیام پشتیبانی از کاربر مسدود*\n\n` +
+  `👤 کاربر: *${firstName}*${username ? ` (@${username})` : ""}\n` +
+  `🔢 آیدی: \`${userId}\`\n\n` +
+  `💬 پیام:\n${text}`;
 
 export const ADMIN_ADD_BALANCE_PROMPT = (): string =>
   `💰 *افزایش موجودی دستی*\n\nآیدی عددی کاربر را وارد کنید:\n\nبرای انصراف 🔙 را بزنید.`;
@@ -182,8 +189,7 @@ export const ADMIN_USER_UNBLOCKED = (firstName: string, userId: number): string 
   `✅ کاربر *${firstName}* (\`${userId}\`) آزاد شد.`;
 
 export const ADMIN_TRANSFER_PROMPT = (): string =>
-  `💸 *انتقال اعتبار کاربر*\n\n` +
-  `فرمت: \`[شناسه مبدا] [شناسه مقصد] [مبلغ]\`\n\nمثال: \`111 222 5000\`\n\nبرای انصراف 🔙 را بزنید.`;
+  `💸 *انتقال اعتبار کاربر*\n\nفرمت: \`[شناسه مبدا] [شناسه مقصد] [مبلغ]\`\n\nمثال: \`111 222 5000\`\n\nبرای انصراف 🔙 را بزنید.`;
 
 export const ADMIN_TRANSFER_SUCCESS = (from: number, to: number, amount: number): string =>
   `✅ *انتقال موفق*\n\n${amount.toLocaleString("fa-IR")} تومان از \`${from}\` به \`${to}\` منتقل شد.`;
