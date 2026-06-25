@@ -3,14 +3,14 @@ import { logger } from "../lib/logger";
 import {
   userMainKeyboard, walletKeyboard, referralKeyboard, profileKeyboard,
   backKeyboard, adminMainKeyboard, adminManageKeyboard, channelCheckKeyboard,
-  blockedKeyboard, depositReviewKeyboard, unblockKeyboard, removeKeyboard,
-  USER_BUTTONS, WALLET_BUTTONS, ADMIN_BUTTONS, MANAGE_BUTTONS, BACK_BUTTON, MINIMIZE_BUTTON,
+  blockedKeyboard, depositReviewKeyboard, unblockKeyboard,
+  USER_BUTTONS, WALLET_BUTTONS, ADMIN_BUTTONS, MANAGE_BUTTONS, BACK_BUTTON,
 } from "./keyboards";
 import {
   WELCOME_MESSAGE, MAIN_MENU_MESSAGE, NOT_MEMBER_MESSAGE,
   ADMIN_PANEL_MESSAGE, ADMIN_MANAGE_MESSAGE, SUPPORT_MESSAGE,
-  BLOCKED_SUPPORT_SENT, BLOCKED_ONLY_SUPPORT, MINIMIZE_MENU_MESSAGE,
-  TOKEN_SECTION_MESSAGE, TOKEN_ENTER_PROMPT, TOKEN_SUCCESS_MESSAGE,
+  BLOCKED_SUPPORT_SENT, BLOCKED_ONLY_SUPPORT,
+  TOKEN_SECTION_MESSAGE, TOKEN_SUCCESS_MESSAGE,
   TOKEN_INVALID_MESSAGE, TOKEN_ALREADY_USED_MESSAGE, TOKEN_CREATED_MESSAGE,
   WALLET_MESSAGE, ADD_BALANCE_AMOUNT_PROMPT, ADD_BALANCE_RECEIPT, BALANCE_REQUEST_SENT,
   BALANCE_APPROVED_USER, BALANCE_REJECTED_USER,
@@ -28,7 +28,7 @@ import {
   ADMIN_TRANSFER_PROMPT, ADMIN_TRANSFER_SUCCESS,
 } from "./messages";
 import {
-  addUser, getUser, getAllUsers, getBlockedUsers, getUserCount, activateUser, isUserActivated,
+  addUser, getUser, getAllUsers, getBlockedUsers, getUserCount, activateUser,
   isUserBlocked, blockUser, unblockUser,
   createToken, validateAndUseToken, getTokenCount, getUnusedTokenCount,
   getUserBalance, addBalance, transferBalance,
@@ -135,7 +135,6 @@ bot.onText(/\/start(.*)/, async (msg, match) => {
     addUser({ id: userId, firstName, lastName: msg.from!.last_name, username: msg.from!.username, referredBy });
 
     if (isAdmin(userId)) {
-      if (!isUserActivated(userId)) activateUser(userId);
       await sendAdminPanel(chatId);
       return;
     }
@@ -249,12 +248,6 @@ bot.on("message", async (msg) => {
     const text      = msg.text ?? "";
 
     if (msg.text) await delMsg(chatId, msg.message_id);
-
-    // ── بستن منو (همه کاربران) ──
-    if (text === MINIMIZE_BUTTON) {
-      await safeSend(() => bot.sendMessage(chatId, MINIMIZE_MENU_MESSAGE(), { parse_mode: "Markdown", reply_markup: removeKeyboard() }), `minimize:${chatId}`);
-      return;
-    }
 
     // ── بازگشت ──
     if (text === BACK_BUTTON) {
@@ -407,7 +400,6 @@ bot.on("message", async (msg) => {
           () => bot.sendMessage(chatId, BLOCKED_LIST_MESSAGE(blockedUsers), { parse_mode: "Markdown", reply_markup: adminManageKeyboard() }),
           `blockedList:${chatId}`
         );
-        // برای هر کاربر مسدود یک دکمه آزادسازی بفرست
         for (const u of blockedUsers) {
           await safeSend(
             () => bot.sendMessage(chatId,
@@ -423,11 +415,10 @@ bot.on("message", async (msg) => {
     }
 
     // ══════════════════════════════════════════════════════════════════
-    // BLOCKED USERS — فقط پشتیبانی
+    // BLOCKED USERS
     // ══════════════════════════════════════════════════════════════════
     if (isUserBlocked(userId)) {
       if (text === USER_BUTTONS.SUPPORT) {
-        // پیام به ادمین‌ها: کاربر مسدود درخواست پشتیبانی دارد
         const user = getUser(userId);
         for (const adminId of ADMIN_IDS) {
           await safeSend(
@@ -462,7 +453,6 @@ bot.on("message", async (msg) => {
       return;
     }
 
-    // pending: addBalance — ورود مبلغ
     if (isPending(userId, "addBalance")) {
       if (!text) return;
       const amount = parseInt(text.replace(/\D/g, ""), 10);
