@@ -1,7 +1,6 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { resolve } from "node:path";
 
-// ── Persistence ───────────────────────────────────────────────────
 const DATA_DIR  = resolve(process.env["DATA_DIR"] ?? "./data");
 const DATA_FILE = resolve(DATA_DIR, "db.json");
 
@@ -48,7 +47,6 @@ function saveData() {
   writeFileSync(DATA_FILE, JSON.stringify(data, null, 2), "utf8");
 }
 
-// ── Types ─────────────────────────────────────────────────────────
 export interface UserRecord {
   id: number;
   firstName: string;
@@ -81,15 +79,12 @@ export interface BalanceRequest {
   status: "pending" | "approved" | "rejected";
 }
 
-// ── Load persisted data ───────────────────────────────────────────
 const persisted = loadData();
-
 const users           = new Map<number, UserRecord>(Object.entries(persisted.users).map(([k, v]) => [Number(k), v]));
 const tokens          = new Map<string, TokenRecord>(Object.entries(persisted.tokens));
 const balanceRequests = new Map<string, BalanceRequest>(Object.entries(persisted.balanceRequests));
 let cardNumber        = persisted.cardNumber ?? "";
 
-// ── Helpers ───────────────────────────────────────────────────────
 function generateReferralCode(userId: number): string { return `REF${userId}`; }
 function generateId(): string { return Math.random().toString(36).slice(2, 10).toUpperCase(); }
 
@@ -99,7 +94,6 @@ function generateTokenCode(): string {
   return `SALF-${part()}-${part()}`;
 }
 
-// ── Users ─────────────────────────────────────────────────────────
 export function addUser(user: {
   id: number; firstName: string; lastName?: string; username?: string; referredBy?: number;
 }): void {
@@ -123,6 +117,7 @@ export function addUser(user: {
 
 export function getUser(userId: number): UserRecord | undefined { return users.get(userId); }
 export function getAllUsers(): UserRecord[] { return Array.from(users.values()); }
+export function getBlockedUsers(): UserRecord[] { return Array.from(users.values()).filter(u => u.isBlocked); }
 export function getUserCount(): number { return users.size; }
 export function isUserActivated(userId: number): boolean { return users.get(userId)?.isActivated ?? false; }
 export function isUserBlocked(userId: number): boolean { return users.get(userId)?.isBlocked ?? false; }
@@ -158,7 +153,6 @@ export function deductBalance(userId: number, amount: number): boolean {
   u.balance -= amount; saveData(); return true;
 }
 
-// ── Tokens ────────────────────────────────────────────────────────
 export function createToken(adminId: number): string {
   let code = generateTokenCode();
   while (tokens.has(code)) code = generateTokenCode();
@@ -178,16 +172,13 @@ export function validateAndUseToken(code: string, userId: number): { valid: bool
 export function getTokenCount(): number { return tokens.size; }
 export function getUnusedTokenCount(): number { return Array.from(tokens.values()).filter((t) => !t.isUsed).length; }
 
-// ── Balance Requests ──────────────────────────────────────────────
 export function createBalanceRequest(userId: number, amount: number): string {
   const id = generateId();
   balanceRequests.set(id, { id, userId, amount, requestedAt: new Date(), status: "pending" });
   saveData(); return id;
 }
 
-export function getBalanceRequest(id: string): BalanceRequest | undefined {
-  return balanceRequests.get(id);
-}
+export function getBalanceRequest(id: string): BalanceRequest | undefined { return balanceRequests.get(id); }
 
 export function getPendingBalanceRequests(): BalanceRequest[] {
   return Array.from(balanceRequests.values()).filter((r) => r.status === "pending");
@@ -206,7 +197,6 @@ export function rejectBalanceRequest(requestId: string): boolean {
   req.status = "rejected"; saveData(); return true;
 }
 
-// ── Transfers ─────────────────────────────────────────────────────
 export function transferBalance(
   fromUserId: number, toUserId: number, amount: number
 ): { ok: boolean; reason?: string } {
@@ -215,67 +205,44 @@ export function transferBalance(
   addBalance(toUserId, amount); return { ok: true };
 }
 
-// ── Card Number ───────────────────────────────────────────────────
 export function setCardNumber(card: string): void { cardNumber = card; saveData(); }
 export function getCardNumber(): string { return cardNumber; }
 
-// ── Pending states ────────────────────────────────────────────────
 type PendingSet = "broadcast" | "tokenEntry" | "addBalance" | "transferInput"
   | "cardNumberInput" | "adminTransfer" | "adminAddBalance" | "adminAddBalanceAmount" | "adminMessageUser";
 
 const SETS: Record<PendingSet, Set<number>> = {
-  broadcast:            new Set(),
-  tokenEntry:           new Set(),
-  addBalance:           new Set(),
-  transferInput:        new Set(),
-  cardNumberInput:      new Set(),
-  adminTransfer:        new Set(),
-  adminAddBalance:      new Set(),
-  adminAddBalanceAmount: new Set(),
-  adminMessageUser:     new Set(),
+  broadcast: new Set(), tokenEntry: new Set(), addBalance: new Set(),
+  transferInput: new Set(), cardNumberInput: new Set(), adminTransfer: new Set(),
+  adminAddBalance: new Set(), adminAddBalanceAmount: new Set(), adminMessageUser: new Set(),
 };
 
-// Extra data maps for pending states that need additional info
-const addBalanceData    = new Map<number, { amount: number; receiptId: string }>();
-const adminBalanceTarget = new Map<number, number>(); // adminId → targetUserId
-const adminMessageTarget = new Map<number, number>(); // adminId → targetUserId
+const addBalanceData     = new Map<number, { amount: number; receiptId: string }>();
+const adminBalanceTarget = new Map<number, number>();
+const adminMessageTarget = new Map<number, number>();
 
 export function setPending(userId: number, state: PendingSet): void {
-  clearAllPending(userId);
-  SETS[state].add(userId);
+  clearAllPending(userId); SETS[state].add(userId);
 }
-
 export function clearAllPending(userId: number): void {
   for (const s of Object.values(SETS)) s.delete(userId);
   addBalanceData.delete(userId);
   adminBalanceTarget.delete(userId);
   adminMessageTarget.delete(userId);
 }
+export function isPending(userId: number, state: PendingSet): boolean { return SETS[state].has(userId); }
 
-export function isPending(userId: number, state: PendingSet): boolean {
-  return SETS[state].has(userId);
-}
-
-// addBalance receipt data
 export function setAddBalanceData(userId: number, amount: number, receiptId: string): void {
   addBalanceData.set(userId, { amount, receiptId });
 }
 export function getAddBalanceData(userId: number): { amount: number; receiptId: string } | undefined {
   return addBalanceData.get(userId);
 }
-
-// admin add balance target
 export function setAdminBalanceTarget(adminId: number, targetUserId: number): void {
   adminBalanceTarget.set(adminId, targetUserId);
 }
-export function getAdminBalanceTarget(adminId: number): number | undefined {
-  return adminBalanceTarget.get(adminId);
-}
-
-// admin message target
+export function getAdminBalanceTarget(adminId: number): number | undefined { return adminBalanceTarget.get(adminId); }
 export function setAdminMessageTarget(adminId: number, targetUserId: number): void {
   adminMessageTarget.set(adminId, targetUserId);
 }
-export function getAdminMessageTarget(adminId: number): number | undefined {
-  return adminMessageTarget.get(adminId);
-}
+export function getAdminMessageTarget(adminId: number): number | undefined { return adminMessageTarget.get(adminId); }
