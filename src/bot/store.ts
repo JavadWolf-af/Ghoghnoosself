@@ -180,10 +180,6 @@ export function createBalanceRequest(userId: number, amount: number): string {
 
 export function getBalanceRequest(id: string): BalanceRequest | undefined { return balanceRequests.get(id); }
 
-export function getPendingBalanceRequests(): BalanceRequest[] {
-  return Array.from(balanceRequests.values()).filter((r) => r.status === "pending");
-}
-
 export function approveBalanceRequest(requestId: string): { ok: boolean; userId?: number; amount?: number } {
   const req = balanceRequests.get(requestId);
   if (!req || req.status !== "pending") return { ok: false };
@@ -224,13 +220,32 @@ const adminMessageTarget = new Map<number, number>();
 export function setPending(userId: number, state: PendingSet): void {
   clearAllPending(userId); SETS[state].add(userId);
 }
+
 export function clearAllPending(userId: number): void {
   for (const s of Object.values(SETS)) s.delete(userId);
   addBalanceData.delete(userId);
   adminBalanceTarget.delete(userId);
   adminMessageTarget.delete(userId);
 }
+
 export function isPending(userId: number, state: PendingSet): boolean { return SETS[state].has(userId); }
+
+export function isPendingAny(userId: number): boolean {
+  return Object.values(SETS).some(s => s.has(userId));
+}
+
+export function isPendingWallet(userId: number): boolean {
+  return SETS["addBalance"].has(userId) || SETS["transferInput"].has(userId);
+}
+
+export function isPendingAdminManage(userId: number): boolean {
+  return SETS["broadcast"].has(userId)
+    || SETS["cardNumberInput"].has(userId)
+    || SETS["adminTransfer"].has(userId)
+    || SETS["adminAddBalance"].has(userId)
+    || SETS["adminAddBalanceAmount"].has(userId)
+    || SETS["adminMessageUser"].has(userId);
+}
 
 export function setAddBalanceData(userId: number, amount: number, receiptId: string): void {
   addBalanceData.set(userId, { amount, receiptId });
