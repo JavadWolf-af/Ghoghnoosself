@@ -3,8 +3,7 @@ import type {
   ReplyKeyboardMarkup,
 } from "node-telegram-bot-api";
 
-export const BACK_BUTTON     = "🔙 بازگشت";
-export const MINIMIZE_BUTTON = "🔽 بستن منو";
+export const BACK_BUTTON = "🔙 بازگشت";
 
 export const USER_BUTTONS = {
   WALLET:   "💰 کیف پول",
@@ -12,7 +11,6 @@ export const USER_BUTTONS = {
   PROFILE:  "👤 پروفایل",
   SUPPORT:  "📞 پشتیبانی",
   TOKEN:    "⭐ افزودن توکن",
-  MINIMIZE: MINIMIZE_BUTTON,
 };
 
 export const WALLET_BUTTONS = {
@@ -24,7 +22,6 @@ export const WALLET_BUTTONS = {
 export const ADMIN_BUTTONS = {
   MENU_MANAGE: "📋 مدیریت منو",
   EXIT_ADMIN:  "🚪 خروج از پنل ادمین",
-  MINIMIZE:    MINIMIZE_BUTTON,
 };
 
 export const MANAGE_BUTTONS = {
@@ -40,9 +37,9 @@ export const MANAGE_BUTTONS = {
 
 export const userMainKeyboard = (): ReplyKeyboardMarkup => ({
   keyboard: [
-    [{ text: USER_BUTTONS.WALLET },   { text: USER_BUTTONS.REFERRAL }],
-    [{ text: USER_BUTTONS.PROFILE },  { text: USER_BUTTONS.SUPPORT }],
-    [{ text: USER_BUTTONS.TOKEN },    { text: USER_BUTTONS.MINIMIZE }],
+    [{ text: USER_BUTTONS.WALLET },  { text: USER_BUTTONS.REFERRAL }],
+    [{ text: USER_BUTTONS.PROFILE }, { text: USER_BUTTONS.SUPPORT }],
+    [{ text: USER_BUTTONS.TOKEN }],
   ],
   resize_keyboard: true,
   is_persistent: true,
@@ -51,7 +48,6 @@ export const userMainKeyboard = (): ReplyKeyboardMarkup => ({
 export const blockedKeyboard = (): ReplyKeyboardMarkup => ({
   keyboard: [
     [{ text: USER_BUTTONS.SUPPORT }],
-    [{ text: USER_BUTTONS.MINIMIZE }],
   ],
   resize_keyboard: true,
   is_persistent: true,
@@ -61,26 +57,26 @@ export const walletKeyboard = (): ReplyKeyboardMarkup => ({
   keyboard: [
     [{ text: WALLET_BUTTONS.ADD_BALANCE }],
     [{ text: WALLET_BUTTONS.TRANSFER }],
-    [{ text: WALLET_BUTTONS.BACK },     { text: USER_BUTTONS.MINIMIZE }],
+    [{ text: WALLET_BUTTONS.BACK }],
   ],
   resize_keyboard: true,
   is_persistent: true,
 });
 
 export const referralKeyboard = (): ReplyKeyboardMarkup => ({
-  keyboard: [[{ text: BACK_BUTTON }, { text: USER_BUTTONS.MINIMIZE }]],
+  keyboard: [[{ text: BACK_BUTTON }]],
   resize_keyboard: true,
   is_persistent: true,
 });
 
 export const profileKeyboard = (): ReplyKeyboardMarkup => ({
-  keyboard: [[{ text: BACK_BUTTON }, { text: USER_BUTTONS.MINIMIZE }]],
+  keyboard: [[{ text: BACK_BUTTON }]],
   resize_keyboard: true,
   is_persistent: true,
 });
 
 export const backKeyboard = (): ReplyKeyboardMarkup => ({
-  keyboard: [[{ text: BACK_BUTTON }, { text: USER_BUTTONS.MINIMIZE }]],
+  keyboard: [[{ text: BACK_BUTTON }]],
   resize_keyboard: true,
   is_persistent: true,
 });
@@ -88,7 +84,7 @@ export const backKeyboard = (): ReplyKeyboardMarkup => ({
 export const adminMainKeyboard = (): ReplyKeyboardMarkup => ({
   keyboard: [
     [{ text: ADMIN_BUTTONS.MENU_MANAGE }],
-    [{ text: ADMIN_BUTTONS.EXIT_ADMIN }, { text: ADMIN_BUTTONS.MINIMIZE }],
+    [{ text: ADMIN_BUTTONS.EXIT_ADMIN }],
   ],
   resize_keyboard: true,
   is_persistent: true,
@@ -100,7 +96,7 @@ export const adminManageKeyboard = (): ReplyKeyboardMarkup => ({
     [{ text: MANAGE_BUTTONS.ADD_TOKEN },     { text: MANAGE_BUTTONS.CARD_NUMBER }],
     [{ text: MANAGE_BUTTONS.ADD_BALANCE },   { text: MANAGE_BUTTONS.TRANSFER_USER }],
     [{ text: MANAGE_BUTTONS.BLOCKED_LIST }],
-    [{ text: MANAGE_BUTTONS.BACK },          { text: USER_BUTTONS.MINIMIZE }],
+    [{ text: MANAGE_BUTTONS.BACK }],
   ],
   resize_keyboard: true,
   is_persistent: true,
@@ -132,5 +128,3 @@ export const depositReviewKeyboard = (requestId: string, userId: number): Inline
 export const unblockKeyboard = (userId: number): InlineKeyboardMarkup => ({
   inline_keyboard: [[{ text: "🔓 آزاد کردن", callback_data: `unblock:${userId}` }]],
 });
-
-export const removeKeyboard = () => ({ remove_keyboard: true as const });
