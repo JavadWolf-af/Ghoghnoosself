@@ -2,9 +2,10 @@ import TelegramBot from "node-telegram-bot-api";
 import { logger } from "../lib/logger";
 import {
   userMainKeyboard, walletKeyboard, referralKeyboard, profileKeyboard,
-  backKeyboard, adminMainKeyboard, adminManageKeyboard, channelCheckKeyboard,
-  blockedKeyboard, depositReviewKeyboard, unblockKeyboard,
-  USER_BUTTONS, WALLET_BUTTONS, ADMIN_BUTTONS, MANAGE_BUTTONS, BACK_BUTTON,
+  backKeyboard, adminBackKeyboard, adminMainKeyboard, adminManageKeyboard,
+  channelCheckKeyboard, blockedKeyboard, depositReviewKeyboard, unblockKeyboard,
+  USER_BUTTONS, WALLET_BUTTONS, ADMIN_BUTTONS, MANAGE_BUTTONS,
+  BACK_BUTTON, MANAGE_BACK_BUTTON,
 } from "./keyboards";
 import {
   WELCOME_MESSAGE, MAIN_MENU_MESSAGE, NOT_MEMBER_MESSAGE,
@@ -96,7 +97,14 @@ async function sendMainMenu(chatId: number, firstName: string) {
 async function sendAdminPanel(chatId: number) {
   await safeSend(
     () => bot.sendMessage(chatId, ADMIN_PANEL_MESSAGE(), { parse_mode: "Markdown", reply_markup: adminMainKeyboard() }),
-    `admin:${chatId}`
+    `adminPanel:${chatId}`
+  );
+}
+
+async function sendAdminManage(chatId: number) {
+  await safeSend(
+    () => bot.sendMessage(chatId, ADMIN_MANAGE_MESSAGE(), { parse_mode: "Markdown", reply_markup: adminManageKeyboard() }),
+    `adminManage:${chatId}`
   );
 }
 
@@ -161,7 +169,6 @@ bot.on("callback_query", async (query) => {
   const msgId   = query.message?.message_id;
 
   await bot.answerCallbackQuery(query.id).catch(() => {});
-
   if (!isAdmin(adminId)) return;
 
   if (data.startsWith("dep_approve:")) {
@@ -176,8 +183,8 @@ bot.on("callback_query", async (query) => {
 
   if (data.startsWith("dep_reject:")) {
     const requestId = data.replace("dep_reject:", "");
-    const req       = getBalanceRequest(requestId);
-    const ok        = rejectBalanceRequest(requestId);
+    const req = getBalanceRequest(requestId);
+    const ok  = rejectBalanceRequest(requestId);
     if (!ok) { await bot.sendMessage(chatId, "⚠️ این درخواست قبلاً پردازش شده است.", { parse_mode: "Markdown" }); return; }
     if (req) await safeSend(() => bot.sendMessage(req.userId, BALANCE_REJECTED_USER(), { parse_mode: "Markdown", reply_markup: walletKeyboard() }), `reject:${req.userId}`);
     if (msgId) await bot.editMessageCaption(ADMIN_DEPOSIT_REJECTED(requestId), { chat_id: chatId, message_id: msgId, parse_mode: "Markdown" }).catch(() => {});
@@ -188,7 +195,7 @@ bot.on("callback_query", async (query) => {
     const targetUserId = parseInt(data.replace("dep_msg:", ""), 10);
     setAdminMessageTarget(adminId, targetUserId);
     setPending(adminId, "adminMessageUser");
-    await safeSend(() => bot.sendMessage(chatId, ADMIN_MSG_PROMPT(), { parse_mode: "Markdown", reply_markup: backKeyboard() }), `msgPrompt:${chatId}`);
+    await safeSend(() => bot.sendMessage(chatId, ADMIN_MSG_PROMPT(), { parse_mode: "Markdown", reply_markup: adminBackKeyboard() }), `msgPrompt:${chatId}`);
     return;
   }
 
@@ -224,7 +231,6 @@ bot.on("photo", async (msg) => {
 
     const balanceData = getAddBalanceData(userId);
     if (!balanceData) return;
-
     clearAllPending(userId);
 
     const fileId    = msg.photo![msg.photo!.length - 1]!.file_id;
@@ -249,17 +255,22 @@ bot.on("message", async (msg) => {
 
     if (msg.text) await delMsg(chatId, msg.message_id);
 
-    // ── بازگشت ──
-    if (text === BACK_BUTTON) {
+    // ── بازگشت از منوی مدیریت → پنل ادمین ──
+    if (text === MANAGE_BACK_BUTTON && isAdmin(userId)) {
       clearAllPending(userId);
-      if (isAdmin(userId)) await sendAdminPanel(chatId);
-      else await sendMainMenu(chatId, firstName);
+      await sendAdminPanel(chatId);
       return;
     }
 
-    if (text === MANAGE_BUTTONS.BACK) {
+    // ── بازگشت عادی ──
+    if (text === BACK_BUTTON) {
       clearAllPending(userId);
-      await sendAdminPanel(chatId);
+      if (isAdmin(userId)) {
+        // از pending state ادمین → برگشت به منوی مدیریت (یک مرحله قبل)
+        await sendAdminManage(chatId);
+      } else {
+        await sendMainMenu(chatId, firstName);
+      }
       return;
     }
 
@@ -317,7 +328,7 @@ bot.on("message", async (msg) => {
         }
         setAdminBalanceTarget(userId, targetId);
         setPending(userId, "adminAddBalanceAmount");
-        await safeSend(() => bot.sendMessage(chatId, ADMIN_ADD_BALANCE_AMOUNT_PROMPT(targetUser.firstName), { parse_mode: "Markdown", reply_markup: backKeyboard() }), `addBalAmount:${chatId}`);
+        await safeSend(() => bot.sendMessage(chatId, ADMIN_ADD_BALANCE_AMOUNT_PROMPT(targetUser.firstName), { parse_mode: "Markdown", reply_markup: adminBackKeyboard() }), `addBalAmount:${chatId}`);
         return;
       }
 
@@ -325,7 +336,7 @@ bot.on("message", async (msg) => {
         if (!text) return;
         const targetId = getAdminBalanceTarget(userId);
         clearAllPending(userId);
-        if (targetId === undefined) { await sendAdminPanel(chatId); return; }
+        if (targetId === undefined) { await sendAdminManage(chatId); return; }
         const amount = parseInt(text.trim().replace(/\D/g, ""), 10);
         if (!amount || amount <= 0) {
           await safeSend(() => bot.sendMessage(chatId, "❌ مبلغ نامعتبر است.", { parse_mode: "Markdown", reply_markup: adminManageKeyboard() }), `badAmount:${chatId}`);
@@ -360,10 +371,13 @@ bot.on("message", async (msg) => {
       }
 
       if (text === ADMIN_BUTTONS.MENU_MANAGE) {
-        await safeSend(() => bot.sendMessage(chatId, ADMIN_MANAGE_MESSAGE(), { parse_mode: "Markdown", reply_markup: adminManageKeyboard() }), `manage:${chatId}`);
+        await sendAdminManage(chatId);
         return;
       }
-      if (text === ADMIN_BUTTONS.EXIT_ADMIN) { await sendMainMenu(chatId, firstName); return; }
+      if (text === ADMIN_BUTTONS.EXIT_ADMIN) {
+        await sendMainMenu(chatId, firstName);
+        return;
+      }
 
       if (text === MANAGE_BUTTONS.STATS) {
         await safeSend(() => bot.sendMessage(chatId, STATS_MESSAGE(getUserCount(), getTokenCount(), getUnusedTokenCount()), { parse_mode: "Markdown", reply_markup: adminManageKeyboard() }), `stats:${chatId}`);
@@ -371,7 +385,7 @@ bot.on("message", async (msg) => {
       }
       if (text === MANAGE_BUTTONS.BROADCAST) {
         setPending(userId, "broadcast");
-        await safeSend(() => bot.sendMessage(chatId, BROADCAST_PROMPT(), { parse_mode: "Markdown", reply_markup: backKeyboard() }), `bcPrompt:${chatId}`);
+        await safeSend(() => bot.sendMessage(chatId, BROADCAST_PROMPT(), { parse_mode: "Markdown", reply_markup: adminBackKeyboard() }), `bcPrompt:${chatId}`);
         return;
       }
       if (text === MANAGE_BUTTONS.ADD_TOKEN) {
@@ -381,17 +395,17 @@ bot.on("message", async (msg) => {
       }
       if (text === MANAGE_BUTTONS.CARD_NUMBER) {
         setPending(userId, "cardNumberInput");
-        await safeSend(() => bot.sendMessage(chatId, CARD_NUMBER_PROMPT(), { parse_mode: "Markdown", reply_markup: backKeyboard() }), `cardPrompt:${chatId}`);
+        await safeSend(() => bot.sendMessage(chatId, CARD_NUMBER_PROMPT(), { parse_mode: "Markdown", reply_markup: adminBackKeyboard() }), `cardPrompt:${chatId}`);
         return;
       }
       if (text === MANAGE_BUTTONS.ADD_BALANCE) {
         setPending(userId, "adminAddBalance");
-        await safeSend(() => bot.sendMessage(chatId, ADMIN_ADD_BALANCE_PROMPT(), { parse_mode: "Markdown", reply_markup: backKeyboard() }), `addBal:${chatId}`);
+        await safeSend(() => bot.sendMessage(chatId, ADMIN_ADD_BALANCE_PROMPT(), { parse_mode: "Markdown", reply_markup: adminBackKeyboard() }), `addBal:${chatId}`);
         return;
       }
       if (text === MANAGE_BUTTONS.TRANSFER_USER) {
         setPending(userId, "adminTransfer");
-        await safeSend(() => bot.sendMessage(chatId, ADMIN_TRANSFER_PROMPT(), { parse_mode: "Markdown", reply_markup: backKeyboard() }), `atrPrompt:${chatId}`);
+        await safeSend(() => bot.sendMessage(chatId, ADMIN_TRANSFER_PROMPT(), { parse_mode: "Markdown", reply_markup: adminBackKeyboard() }), `atrPrompt:${chatId}`);
         return;
       }
       if (text === MANAGE_BUTTONS.BLOCKED_LIST) {
