@@ -3,7 +3,8 @@ import type {
   ReplyKeyboardMarkup,
 } from "node-telegram-bot-api";
 
-export const BACK_BUTTON = "🔙 بازگشت";
+export const BACK_BUTTON        = "🔙 بازگشت";
+export const MANAGE_BACK_BUTTON = "🔙 پنل اصلی";
 
 export const USER_BUTTONS = {
   WALLET:   "💰 کیف پول",
@@ -32,7 +33,7 @@ export const MANAGE_BUTTONS = {
   ADD_BALANCE:   "💰 افزایش موجودی",
   TRANSFER_USER: "💸 انتقال اعتبار کاربر",
   BLOCKED_LIST:  "🚫 لیست مسدود شده‌ها",
-  BACK:          BACK_BUTTON,
+  BACK:          MANAGE_BACK_BUTTON,
 };
 
 export const userMainKeyboard = (): ReplyKeyboardMarkup => ({
@@ -46,9 +47,7 @@ export const userMainKeyboard = (): ReplyKeyboardMarkup => ({
 });
 
 export const blockedKeyboard = (): ReplyKeyboardMarkup => ({
-  keyboard: [
-    [{ text: USER_BUTTONS.SUPPORT }],
-  ],
+  keyboard: [[{ text: USER_BUTTONS.SUPPORT }]],
   resize_keyboard: true,
   is_persistent: true,
 });
@@ -76,6 +75,12 @@ export const profileKeyboard = (): ReplyKeyboardMarkup => ({
 });
 
 export const backKeyboard = (): ReplyKeyboardMarkup => ({
+  keyboard: [[{ text: BACK_BUTTON }]],
+  resize_keyboard: true,
+  is_persistent: true,
+});
+
+export const adminBackKeyboard = (): ReplyKeyboardMarkup => ({
   keyboard: [[{ text: BACK_BUTTON }]],
   resize_keyboard: true,
   is_persistent: true,
