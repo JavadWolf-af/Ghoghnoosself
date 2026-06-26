@@ -2,7 +2,6 @@ import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { build as esbuild } from "esbuild";
-import esbuildPluginPino from "esbuild-plugin-pino";
 import { rm } from "node:fs/promises";
 
 globalThis.require = createRequire(import.meta.url);
@@ -20,9 +19,16 @@ async function buildAll() {
     outdir: distDir,
     outExtension: { ".js": ".mjs" },
     logLevel: "info",
-    external: ["*.node", "bufferutil", "utf-8-validate", "telegram"],
+    external: [
+      "*.node",
+      "bufferutil",
+      "utf-8-validate",
+      "telegram",
+      "pino-pretty",
+      "thread-stream",
+      "pino/file",
+    ],
     sourcemap: "linked",
-    plugins: [esbuildPluginPino({ transports: ["pino-pretty"] })],
     banner: {
       js: `import { createRequire as __cr } from 'node:module';
 import __path from 'node:path';
