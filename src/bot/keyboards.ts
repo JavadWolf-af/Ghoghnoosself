@@ -3,6 +3,8 @@ import type {
   ReplyKeyboardMarkup,
 } from "node-telegram-bot-api";
 
+// ── Inline Navigation Keyboards ───────────────────────────────────────────────
+
 export const userMainKeyboard = (): InlineKeyboardMarkup => ({
   inline_keyboard: [
     [{ text: "💎 کیف پول", callback_data: "nav:wallet" },       { text: "🔗 دعوت از دوستان", callback_data: "nav:referral" }],
@@ -24,15 +26,32 @@ export const adminMainKeyboard = (): InlineKeyboardMarkup => ({
   ],
 });
 
+// ── صفحه اصلی مدیریت — تمیز و دسته‌بندی‌شده ─────────────────────────────────
 export const adminManageKeyboard = (): InlineKeyboardMarkup => ({
   inline_keyboard: [
-    [{ text: "📊 آمار سیستم",     callback_data: "nav:admin_stats" },        { text: "📣 پیام همگانی",     callback_data: "nav:admin_broadcast" }],
-    [{ text: "🔑 توکن جدید",      callback_data: "nav:admin_create_token" }, { text: "💳 شماره کارت",     callback_data: "nav:admin_set_card" }],
+    [{ text: "📊 آمار سیستم",     callback_data: "nav:admin_stats" },       { text: "👥 مدیریت کاربران",  callback_data: "nav:admin_user_manage" }],
+    [{ text: "🔑 مدیریت توکن",    callback_data: "nav:admin_token_manage" }, { text: "💳 شماره کارت",     callback_data: "nav:admin_set_card" }],
     [{ text: "💰 افزودن موجودی", callback_data: "nav:admin_add_balance" },  { text: "↔️ انتقال اعتبار", callback_data: "nav:admin_transfer" }],
-    [{ text: "🎫 تیکت‌های باز",  callback_data: "nav:admin_open_tickets" }, { text: "🚫 لیست مسدودها",   callback_data: "nav:admin_blocked_list" }],
-    [{ text: "🔍 جستجوی کاربر",  callback_data: "nav:admin_search_user" },  { text: "💬 پیام به کاربر",  callback_data: "nav:admin_message_user" }],
-    [{ text: "🔑 هزینه توکن",    callback_data: "nav:admin_token_cost" },   { text: "⏳ توکن‌های گریس",  callback_data: "nav:admin_grace_tokens" }],
+    [{ text: "🎫 تیکت‌های باز",  callback_data: "nav:admin_open_tickets" }],
     [{ text: "🔙 بازگشت",         callback_data: "nav:back" }],
+  ],
+});
+
+// ── زیرمنوی مدیریت توکن ──────────────────────────────────────────────────────
+export const tokenManageKeyboard = (): InlineKeyboardMarkup => ({
+  inline_keyboard: [
+    [{ text: "🔑 توکن جدید",    callback_data: "nav:admin_create_token" }],
+    [{ text: "💵 هزینه توکن",   callback_data: "nav:admin_token_cost" },  { text: "⏳ توکن‌های گریس", callback_data: "nav:admin_grace_tokens" }],
+    [{ text: "🔙 بازگشت",        callback_data: "nav:admin_manage" }],
+  ],
+});
+
+// ── زیرمنوی مدیریت کاربران ───────────────────────────────────────────────────
+export const userManageKeyboard = (): InlineKeyboardMarkup => ({
+  inline_keyboard: [
+    [{ text: "📣 پیام همگانی",   callback_data: "nav:admin_broadcast" },   { text: "💬 پیام به کاربر",  callback_data: "nav:admin_message_user" }],
+    [{ text: "🔍 جستجوی کاربر", callback_data: "nav:admin_search_user" },  { text: "🚫 لیست مسدودها",  callback_data: "nav:admin_blocked_list" }],
+    [{ text: "🔙 بازگشت",        callback_data: "nav:admin_manage" }],
   ],
 });
 
@@ -45,6 +64,8 @@ export const blockedKeyboard = (): ReplyKeyboardMarkup => ({
   resize_keyboard: true,
   is_persistent: true,
 });
+
+// ── Inline Keyboards (عملیات ادمین) ──────────────────────────────────────────
 
 export const depositReviewKeyboard = (requestId: string, userId: number): InlineKeyboardMarkup => ({
   inline_keyboard: [
@@ -124,7 +145,7 @@ export const tokenCostKeyboard = (): InlineKeyboardMarkup => ({
   inline_keyboard: [
     [{ text: "✏️ تنظیم هزینه روزانه", callback_data: "nav:admin_set_token_cost" }],
     [{ text: "⏳ مشاهده توکن‌های گریس",  callback_data: "nav:admin_grace_tokens" }],
-    [{ text: "🔙 بازگشت",                callback_data: "nav:back" }],
+    [{ text: "🔙 بازگشت",                callback_data: "nav:admin_token_manage" }],
   ],
 });
 
