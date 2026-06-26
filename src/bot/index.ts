@@ -23,7 +23,7 @@ import {
   TRANSFER_PROMPT, TRANSFER_SUCCESS, TRANSFER_FAILED,
   REFERRAL_MESSAGE, PROFILE_MESSAGE,
   STATS_MESSAGE, BROADCAST_PROMPT, BROADCAST_SENT,
-  CARD_NUMBER_PROMPT, CARD_NUMBER_SET, BLOCKED_LIST_MESSAGE,
+  CARD_NUMBER_PROMPT, CARD_HOLDER_PROMPT, CARD_BANK_PROMPT, CARD_INFO_SET, BLOCKED_LIST_MESSAGE,
   ADMIN_DEPOSIT_REVIEW, ADMIN_SUPPORT_FROM_BLOCKED,
   ADMIN_ADD_BALANCE_PROMPT, ADMIN_ADD_BALANCE_AMOUNT_PROMPT,
   ADMIN_BALANCE_ADDED, ADMIN_USER_NOT_FOUND, ADMIN_INVALID_ID,
@@ -42,7 +42,8 @@ import {
   createToken, validateAndUseToken, getTokenCount, getUnusedTokenCount,
   getUserBalance, addBalance, transferBalance,
   createBalanceRequest, getBalanceRequest, approveBalanceRequest, rejectBalanceRequest,
-  setCardNumber, getCardNumber,
+  setCardNumber, getCardNumber, setCardHolder, getCardHolder, setCardBank, getCardBank,
+  setPendingCardNumber, getPendingCardNumber, setPendingCardHolder, getPendingCardHolder,
   createSupportTicket, getOpenTicketByUser, getSupportTicket, getAllOpenTickets, findUserByUsername,
   addTicketMessage, closeSupportTicket, getOpenTicketsCount,
   setPending, clearAllPending, isPending, isPendingAdminManage, isPendingWallet,
@@ -596,10 +597,30 @@ bot.on("message", async (msg) => {
         return;
       }
       if (isPending(userId, "cardNumberInput")) {
+        const card = text.trim();
+        setPendingCardNumber(userId, card);
+        setPending(userId, "cardHolderInput");
+        await sendPanel(chatId, CARD_HOLDER_PROMPT(card), { parse_mode: "Markdown", reply_markup: cancelKeyboard() });
+        return;
+      }
+      if (isPending(userId, "cardHolderInput")) {
+        const card   = getPendingCardNumber(userId) ?? "";
+        const holder = text.trim();
+        setPendingCardHolder(userId, holder);
+        setPending(userId, "cardBankInput");
+        await sendPanel(chatId, CARD_BANK_PROMPT(card, holder), { parse_mode: "Markdown", reply_markup: cancelKeyboard() });
+        return;
+      }
+      if (isPending(userId, "cardBankInput")) {
+        const card   = getPendingCardNumber(userId) ?? "";
+        const holder = getPendingCardHolder(userId) ?? "";
+        const bank   = text.trim();
         clearAllPending(userId);
-        await setCardNumber(text.trim());
+        await setCardNumber(card);
+        await setCardHolder(holder);
+        await setCardBank(bank);
         await sendAdminManage(chatId);
-        await sendTracked(chatId, CARD_NUMBER_SET(text.trim()), { parse_mode: "Markdown" });
+        await sendTracked(chatId, CARD_INFO_SET(card, holder, bank), { parse_mode: "Markdown" });
         return;
       }
       if (isPending(userId, "adminMessageUser")) {
@@ -751,7 +772,7 @@ bot.on("message", async (msg) => {
       }
       const receiptId = Math.random().toString(36).slice(2, 10).toUpperCase();
       setAddBalanceData(userId, amount, receiptId);
-      await sendPanel(chatId, ADD_BALANCE_RECEIPT(receiptId, amount, await getCardNumber()), { parse_mode: "Markdown", reply_markup: cancelKeyboard() });
+      await sendPanel(chatId, ADD_BALANCE_RECEIPT(receiptId, amount, await getCardNumber(), await getCardHolder(), await getCardBank()), { parse_mode: "Markdown", reply_markup: cancelKeyboard() });
       return;
     }
     if (isPending(userId, "transferInput")) {
