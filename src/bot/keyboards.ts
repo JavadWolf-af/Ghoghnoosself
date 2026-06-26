@@ -1,110 +1,108 @@
 import type {
-    InlineKeyboardMarkup,
-    ReplyKeyboardMarkup,
-  } from "node-telegram-bot-api";
+  InlineKeyboardMarkup,
+  ReplyKeyboardMarkup,
+} from "node-telegram-bot-api";
 
-  // ── Inline Navigation Keyboards ───────────────────────────────────────────────
+// ── Inline Navigation Keyboards ───────────────────────────────────────────────
 
-  export const userMainKeyboard = (): InlineKeyboardMarkup => ({
-    inline_keyboard: [
-      [{ text: "💎 کیف پول", callback_data: "nav:wallet" },       { text: "🔗 دعوت از دوستان", callback_data: "nav:referral" }],
-      [{ text: "👤 پروفایل", callback_data: "nav:profile" },      { text: "🎧 پشتیبانی", callback_data: "nav:support" }],
-      [{ text: "🎫 تیکت‌های باز", callback_data: "nav:tickets" }, { text: "🔑 فعال‌سازی توکن", callback_data: "nav:token" }],
+export const userMainKeyboard = (): InlineKeyboardMarkup => ({
+  inline_keyboard: [
+    [{ text: "💎 کیف پول", callback_data: "nav:wallet" },       { text: "🔗 دعوت از دوستان", callback_data: "nav:referral" }],
+    [{ text: "👤 پروفایل", callback_data: "nav:profile" },      { text: "🎧 پشتیبانی", callback_data: "nav:support" }],
+    [{ text: "🎫 تیکت‌های باز", callback_data: "nav:tickets" }, { text: "🔑 فعال‌سازی توکن", callback_data: "nav:token" }],
+  ],
+});
+
+export const walletKeyboard = (): InlineKeyboardMarkup => ({
+  inline_keyboard: [
+    [{ text: "💳 افزایش موجودی", callback_data: "nav:add_balance" }, { text: "↗️ انتقال اعتبار", callback_data: "nav:transfer" }],
+    [{ text: "🔙 بازگشت به منو", callback_data: "nav:back" }],
+  ],
+});
+
+export const adminMainKeyboard = (): InlineKeyboardMarkup => ({
+  inline_keyboard: [
+    [{ text: "🛠 پنل مدیریت", callback_data: "nav:admin_manage" }],
+  ],
+});
+
+export const adminManageKeyboard = (): InlineKeyboardMarkup => ({
+  inline_keyboard: [
+    [{ text: "📊 آمار سیستم",     callback_data: "nav:admin_stats" },        { text: "📣 پیام همگانی",     callback_data: "nav:admin_broadcast" }],
+    [{ text: "🔑 توکن جدید",      callback_data: "nav:admin_create_token" }, { text: "💳 شماره کارت",     callback_data: "nav:admin_set_card" }],
+    [{ text: "💰 افزودن موجودی", callback_data: "nav:admin_add_balance" },  { text: "↔️ انتقال اعتبار", callback_data: "nav:admin_transfer" }],
+    [{ text: "🎫 تیکت‌های باز",  callback_data: "nav:admin_open_tickets" }, { text: "🚫 لیست مسدودها",   callback_data: "nav:admin_blocked_list" }],
+    [{ text: "🔍 جستجوی کاربر",  callback_data: "nav:admin_search_user" },  { text: "💬 پیام به کاربر",  callback_data: "nav:admin_message_user" }],
+    [{ text: "🔙 بازگشت",         callback_data: "nav:back" }],
+  ],
+});
+
+// دکمه لغو / بازگشت برای صفحه‌های ورود متن
+export const cancelKeyboard = (): InlineKeyboardMarkup => ({
+  inline_keyboard: [[{ text: "🔙 لغو / بازگشت", callback_data: "nav:back" }]],
+});
+
+// ── Reply Keyboard (فقط کاربران مسدودشده) ────────────────────────────────────
+export const blockedKeyboard = (): ReplyKeyboardMarkup => ({
+  keyboard: [[{ text: "🎧 پشتیبانی" }]],
+  resize_keyboard: true,
+  is_persistent: true,
+});
+
+// ── Inline Keyboards (عملیات ادمین) ──────────────────────────────────────────
+
+export const depositReviewKeyboard = (requestId: string, userId: number): InlineKeyboardMarkup => ({
+  inline_keyboard: [
+    [
+      { text: "✅ تأیید واریز",   callback_data: `deposit:approve:${requestId}` },
+      { text: "❌ رد درخواست",   callback_data: `deposit:reject:${requestId}` },
     ],
-  });
-
-  export const walletKeyboard = (): InlineKeyboardMarkup => ({
-    inline_keyboard: [
-      [{ text: "💳 افزایش موجودی", callback_data: "nav:add_balance" }, { text: "↗️ انتقال اعتبار", callback_data: "nav:transfer" }],
-      [{ text: "🔙 بازگشت به منو", callback_data: "nav:back" }],
+    [
+      { text: "💬 پیام به کاربر", callback_data: `user:msg:${userId}` },
+      { text: "⛔️ مسدود کردن",  callback_data: `user:block:${userId}` },
     ],
-  });
+  ],
+});
 
-  export const adminMainKeyboard = (): InlineKeyboardMarkup => ({
-    inline_keyboard: [
-      [{ text: "🛠 پنل مدیریت", callback_data: "nav:admin_manage" }],
-      [{ text: "🚪 خروج از ادمین", callback_data: "nav:admin_exit" }],
+export const ticketKeyboard = (ticketId: string): InlineKeyboardMarkup => ({
+  inline_keyboard: [[
+    { text: "✏️ پاسخ دادن", callback_data: `ticket:reply:${ticketId}` },
+    { text: "🔒 بستن تیکت", callback_data: `ticket:close:${ticketId}` },
+  ]],
+});
+
+export const unblockKeyboard = (userId: number): InlineKeyboardMarkup => ({
+  inline_keyboard: [[{ text: "🔓 رفع مسدودیت", callback_data: `user:unblock:${userId}` }]],
+});
+
+export const adminUserActionKeyboard = (userId: number, isBlocked: boolean): InlineKeyboardMarkup => ({
+  inline_keyboard: [
+    [
+      { text: "💰 افزودن موجودی", callback_data: `user:addbal:${userId}` },
+      { text: "💬 پیام به کاربر", callback_data: `user:msg:${userId}` },
     ],
-  });
-
-  export const adminManageKeyboard = (): InlineKeyboardMarkup => ({
-    inline_keyboard: [
-      [{ text: "📊 آمار سیستم", callback_data: "nav:manage_stats" },    { text: "📣 پیام همگانی", callback_data: "nav:manage_broadcast" }],
-      [{ text: "🔑 توکن جدید", callback_data: "nav:manage_token" },     { text: "💳 شماره کارت", callback_data: "nav:manage_card" }],
-      [{ text: "💰 افزودن موجودی", callback_data: "nav:manage_addbal" }, { text: "↔️ انتقال اعتبار", callback_data: "nav:manage_transfer" }],
-      [{ text: "🎫 تیکت‌های باز", callback_data: "nav:manage_tickets" }, { text: "🚫 لیست مسدودها", callback_data: "nav:manage_blocked" }],
-      [{ text: "🔍 جستجوی کاربر", callback_data: "nav:manage_search" }],
-      [{ text: "🔙 بازگشت", callback_data: "nav:back" }],
+    [
+      {
+        text: isBlocked ? "🔓 رفع مسدودیت" : "⛔️ مسدود کردن",
+        callback_data: isBlocked ? `user:unblock:${userId}` : `user:block:${userId}`,
+      },
     ],
-  });
+  ],
+});
 
-  // دکمه لغو / بازگشت برای صفحه‌های ورود متن
-  export const cancelKeyboard = (): InlineKeyboardMarkup => ({
-    inline_keyboard: [[{ text: "🔙 لغو / بازگشت", callback_data: "nav:back" }]],
-  });
+export const broadcastConfirmKeyboard = (): InlineKeyboardMarkup => ({
+  inline_keyboard: [[
+    { text: "✅ تأیید و ارسال", callback_data: "broadcast:confirm" },
+    { text: "❌ لغو",            callback_data: "broadcast:cancel" },
+  ]],
+});
 
-  // ── Reply Keyboard (فقط کاربران مسدودشده) ────────────────────────────────────
-  export const blockedKeyboard = (): ReplyKeyboardMarkup => ({
-    keyboard: [[{ text: "🎧 پشتیبانی" }]],
-    resize_keyboard: true,
-    is_persistent: true,
-  });
-
-  // ── Inline Keyboards (عملیات ادمین) ──────────────────────────────────────────
-
-  export const depositReviewKeyboard = (requestId: string, userId: number): InlineKeyboardMarkup => ({
-    inline_keyboard: [
-      [
-        { text: "✅ تأیید واریز",   callback_data: `dep_approve:${requestId}` },
-        { text: "❌ رد درخواست",   callback_data: `dep_reject:${requestId}` },
-      ],
-      [
-        { text: "💬 پیام به کاربر", callback_data: `dep_msg:${userId}` },
-        { text: "⛔️ مسدود کردن",  callback_data: `dep_block:${userId}` },
-      ],
-    ],
-  });
-
-  export const ticketKeyboard = (ticketId: string): InlineKeyboardMarkup => ({
-    inline_keyboard: [[
-      { text: "✏️ پاسخ دادن", callback_data: `tkt_reply:${ticketId}` },
-      { text: "🔒 بستن تیکت", callback_data: `tkt_close:${ticketId}` },
-    ]],
-  });
-
-  export const unblockKeyboard = (userId: number): InlineKeyboardMarkup => ({
-    inline_keyboard: [[{ text: "🔓 رفع مسدودیت", callback_data: `unblock:${userId}` }]],
-  });
-
-  export const adminUserActionKeyboard = (userId: number, isBlocked: boolean): InlineKeyboardMarkup => ({
-    inline_keyboard: [
-      [
-        { text: "💰 افزودن موجودی", callback_data: `usr_addbal:${userId}` },
-        { text: "💬 پیام به کاربر", callback_data: `dep_msg:${userId}` },
-      ],
-      [
-        {
-          text: isBlocked ? "🔓 رفع مسدودیت" : "⛔️ مسدود کردن",
-          callback_data: isBlocked ? `unblock:${userId}` : `dep_block:${userId}`,
-        },
-      ],
-    ],
-  });
-
-  export const broadcastConfirmKeyboard = (): InlineKeyboardMarkup => ({
-    inline_keyboard: [[
-      { text: "✅ تأیید و ارسال", callback_data: "bcast_confirm" },
-      { text: "❌ لغو",            callback_data: "bcast_cancel" },
-    ]],
-  });
-
-  export const channelCheckKeyboard = (
-    channelUrl: string,
-    botUsername: string
-  ): InlineKeyboardMarkup => ({
-    inline_keyboard: [
-      [{ text: "📢 عضویت در کانال", url: channelUrl }],
-      [{ text: "✅ عضو شدم — بررسی کن", url: `https://t.me/${botUsername}?start=checked` }],
-    ],
-  });
-  
+export const channelCheckKeyboard = (
+  channelUrl: string,
+  botUsername: string
+): InlineKeyboardMarkup => ({
+  inline_keyboard: [
+    [{ text: "📢 عضویت در کانال", url: channelUrl }],
+    [{ text: "✅ عضو شدم — بررسی کن", url: `https://t.me/${botUsername}?start=checked` }],
+  ],
+});
