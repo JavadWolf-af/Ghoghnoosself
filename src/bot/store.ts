@@ -52,6 +52,7 @@ export interface SupportTicket {
   status: "open" | "closed";
   createdAt: Date;
   messages: TicketMessage[];
+  lastReminderAt?: Date;
 }
 
 interface PersistedData {
@@ -82,6 +83,7 @@ function loadData(): PersistedData {
     for (const tk of Object.values(raw.tickets ?? {})) {
       tk.createdAt = new Date(tk.createdAt);
       tk.messages = (tk.messages ?? []).map(m => ({ ...m, at: new Date(m.at) }));
+      if (tk.lastReminderAt) tk.lastReminderAt = new Date(tk.lastReminderAt);
     }
     return { ...raw, tickets: raw.tickets ?? {} };
   } catch { return { users: {}, tokens: {}, balanceRequests: {}, tickets: {}, cardNumber: "" }; }
@@ -337,3 +339,35 @@ export function setAdminTicketTarget(adminId: number, ticketId: string): void {
   adminTicketTarget.set(adminId, ticketId);
 }
 export function getAdminTicketTarget(adminId: number): string | undefined { return adminTicketTarget.get(adminId); }
+
+// ── Ticket Reminders ──────────────────────────────────────────────────────────
+
+/**
+ * بازگرداندن تیکت‌هایی که آخرین پیام از کاربر بوده
+ * و در مدت thresholdMs پاسخی دریافت نکرده‌اند.
+ * همچنین از ارسال یادآوری تکراری جلوگیری می‌کند.
+ */
+export function getTicketsNeedingReminder(thresholdMs: number): SupportTicket[] {
+  const now = Date.now();
+  const result: SupportTicket[] = [];
+  for (const ticket of ticketsMap.values()) {
+    if (ticket.status !== "open") continue;
+    if (ticket.messages.length === 0) continue;
+    const lastMsg = ticket.messages[ticket.messages.length - 1]!;
+    if (lastMsg.sender !== "user") continue;
+    const timeSinceLastMsg = now - lastMsg.at.getTime();
+    if (timeSinceLastMsg < thresholdMs) continue;
+    // اگر قبلاً یادآوری فرستاده شده، تا یک بازه دیگر صبر می‌کنیم
+    if (ticket.lastReminderAt) {
+      const timeSinceReminder = now - ticket.lastReminderAt.getTime();
+      if (timeSinceReminder < thresholdMs) continue;
+    }
+    result.push(ticket);
+  }
+  return result;
+}
+
+export function markTicketReminded(ticketId: string): void {
+  const ticket = ticketsMap.get(ticketId);
+  if (ticket) { ticket.lastReminderAt = new Date(); saveData(); }
+}
