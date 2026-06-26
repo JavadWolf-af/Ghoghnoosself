@@ -41,6 +41,7 @@ cd && curl -fsSL https://raw.githubusercontent.com/JavadWolf-af/Ghoghnoosself/ma
 - دیتابیس و کاربر PostgreSQL (با رمز تصادفی)
 - Build ربات
 - سرویس systemd یا pm2
+- دستورات مدیریت (`update`، `backup`، `import`، `uninstall`)
 
 ---
 
@@ -92,6 +93,89 @@ psql -U ghoghnoosself -d ghoghnoosself
 update-ghoghnoosself
 ```
 
+اسکریپت آپدیت به‌طور خودکار:
+- آخرین نسخه را از GitHub دریافت می‌کند
+- در صورت نبود PostgreSQL، آن را نصب می‌کند
+- در صورت نبود `DATABASE_URL`، دیتابیس جدید می‌سازد
+- از داده‌های قدیمی JSON بکاپ می‌گیرد
+- وابستگی‌ها را نصب و ربات را build و restart می‌کند
+
+---
+
+## 📦 بکاپ دیتابیس
+
+```bash
+backup-ghoghnoosself
+```
+
+یک فایل فشرده از تمام داده‌های دیتابیس می‌سازد:
+
+```
+✅ بکاپ با موفقیت گرفته شد
+📦 فایل: ~/ghoghnoosself_backup_20260626_143000.sql.gz
+📏 حجم:  48K
+```
+
+فایل بکاپ شامل:
+- تمام کاربران و موجودی‌ها
+- توکن‌ها و وضعیت فعال‌سازی
+- تاریخچه درخواست‌های افزایش موجودی
+- تیکت‌ها و پیام‌های پشتیبانی
+- تنظیمات ربات (شماره کارت و غیره)
+
+---
+
+## 📥 ایمپورت دیتابیس
+
+```bash
+import-ghoghnoosself <نام-فایل-بکاپ>
+```
+
+مثال:
+
+```bash
+import-ghoghnoosself ~/ghoghnoosself_backup_20260626_143000.sql.gz
+```
+
+اسکریپت ایمپورت:
+- سرویس ربات را متوقف می‌کند
+- تمام داده‌های فعلی دیتابیس را با داده‌های بکاپ جایگزین می‌کند
+- سرویس را مجدداً راه‌اندازی می‌کند
+
+> ⚠️ این عملیات داده‌های فعلی دیتابیس را **بازنویسی** می‌کند. قبل از اجرا تأیید می‌خواهد.
+
+---
+
+## 🚀 انتقال به سرور جدید
+
+برای جابجایی ربات بین دو سرور بدون از دست رفتن داده:
+
+**مرحله ۱ — سرور قدیمی: بکاپ بگیرید**
+
+```bash
+backup-ghoghnoosself
+```
+
+**مرحله ۲ — انتقال فایل بکاپ به سرور جدید**
+
+```bash
+scp ~/ghoghnoosself_backup_*.sql.gz user@new-server:~/
+```
+
+**مرحله ۳ — سرور جدید: ربات را نصب کنید**
+
+```bash
+cd && curl -fsSL https://raw.githubusercontent.com/JavadWolf-af/Ghoghnoosself/main/install.sh | bash
+```
+
+**مرحله ۴ — سرور جدید: داده‌ها را ایمپورت کنید**
+
+```bash
+import-ghoghnoosself ~/ghoghnoosself_backup_*.sql.gz
+```
+
+پس از اتمام، تمام کاربران، موجودی‌ها، توکن‌ها و تیکت‌ها در سرور جدید موجود هستند.
+
 ---
 
 ## 🗑 حذف کامل
@@ -99,6 +183,17 @@ update-ghoghnoosself
 ```bash
 uninstall-ghoghnoosself
 ```
+
+---
+
+## 📋 خلاصه دستورات مدیریت
+
+| دستور | توضیح |
+|---|---|
+| `update-ghoghnoosself` | آپدیت به آخرین نسخه |
+| `backup-ghoghnoosself` | بکاپ از تمام داده‌های دیتابیس |
+| `import-ghoghnoosself <file>` | ایمپورت بکاپ (انتقال سرور) |
+| `uninstall-ghoghnoosself` | حذف کامل ربات و سرویس |
 
 ---
 
@@ -124,6 +219,8 @@ Ghoghnoosself/
 ├── drizzle.config.ts     # تنظیمات Drizzle Kit
 ├── install.sh            # نصب خودکار
 ├── update.sh             # آپدیت خودکار
+├── backup.sh             # بکاپ دیتابیس
+├── import.sh             # ایمپورت دیتابیس
 ├── uninstall.sh          # حذف کامل
 ├── .env.example          # نمونه تنظیمات
 └── package.json
