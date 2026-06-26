@@ -229,12 +229,10 @@ async function notifyAdminsDeposit(
   const caption = ADMIN_DEPOSIT_REVIEW(requestId, amount, userId, firstName, username);
   for (const adminId of ADMIN_IDS) {
     try {
-      const sent = await bot.sendPhoto(adminId, receiptFileId, {
+      await bot.sendPhoto(adminId, receiptFileId, {
         caption, parse_mode: "Markdown",
         reply_markup: depositReviewKeyboard(requestId, userId),
       });
-      const existing = lastPanelMsgs.get(adminId) ?? [];
-      lastPanelMsgs.set(adminId, [...existing, sent.message_id]);
     } catch (err) { logger.warn({ adminId, err }, "Failed to notify admin of deposit"); }
   }
 }
@@ -247,11 +245,10 @@ async function notifyAdminsTicket(
     ? ADMIN_TICKET_FOLLOWUP(ticketId, userId, firstName, username, text)
     : ADMIN_NEW_TICKET(ticketId, userId, firstName, username, text);
   for (const adminId of ADMIN_IDS) {
-    try {
-      const sent = await bot.sendMessage(adminId, msgText, { parse_mode: "Markdown", reply_markup: ticketKeyboard(ticketId) });
-      const existing = lastPanelMsgs.get(adminId) ?? [];
-      lastPanelMsgs.set(adminId, [...existing, sent.message_id]);
-    } catch { /* ignore */ }
+    await safeSend(
+      () => bot.sendMessage(adminId, msgText, { parse_mode: "Markdown", reply_markup: ticketKeyboard(ticketId) }),
+      `ticket:${adminId}`
+    );
   }
 }
 
