@@ -97,7 +97,60 @@ export const adminManageKeyboard = (): ReplyKeyboardMarkup => ({
   resize_keyboard: true,
 });
 
-// ── Inline Keyboards ──────────────────────────────────────────────────────────
+// ── Inline Keyboards (User Navigation) ───────────────────────────────────────
+
+export const userMainInlineKeyboard = (): InlineKeyboardMarkup => ({
+  inline_keyboard: [
+    [{ text: "💎 کیف پول",          callback_data: "u_wallet"   }, { text: "🔗 دعوت از دوستان", callback_data: "u_referral" }],
+    [{ text: "👤 پروفایل",           callback_data: "u_profile"  }, { text: "🎧 پشتیبانی",       callback_data: "u_support"  }],
+    [{ text: "🎫 تیکت‌های باز",      callback_data: "u_tickets"  }, { text: "🔑 فعال‌سازی توکن", callback_data: "u_token"    }],
+  ],
+});
+
+export const walletInlineKeyboard = (): InlineKeyboardMarkup => ({
+  inline_keyboard: [
+    [{ text: "💳 افزایش موجودی", callback_data: "u_wallet_add" }, { text: "↗️ انتقال اعتبار", callback_data: "u_wallet_transfer" }],
+    [{ text: "⬅️ بازگشت",        callback_data: "u_back" }],
+  ],
+});
+
+export const backToMainInlineKeyboard = (): InlineKeyboardMarkup => ({
+  inline_keyboard: [[{ text: "⬅️ بازگشت", callback_data: "u_back" }]],
+});
+
+export const backToWalletInlineKeyboard = (): InlineKeyboardMarkup => ({
+  inline_keyboard: [[{ text: "⬅️ بازگشت به کیف پول", callback_data: "u_back_wallet" }]],
+});
+
+export const blockedInlineKeyboard = (): InlineKeyboardMarkup => ({
+  inline_keyboard: [[{ text: "🎧 پشتیبانی", callback_data: "u_blocked_support" }]],
+});
+
+// ── Inline Keyboards (Admin Navigation) ──────────────────────────────────────
+
+export const adminMainInlineKeyboard = (): InlineKeyboardMarkup => ({
+  inline_keyboard: [
+    [{ text: "🛠 پنل مدیریت",  callback_data: "adm_manage" }],
+    [{ text: "🚪 خروج از ادمین", callback_data: "adm_exit"   }],
+  ],
+});
+
+export const adminManageInlineKeyboard = (): InlineKeyboardMarkup => ({
+  inline_keyboard: [
+    [{ text: "📊 آمار سیستم",    callback_data: "adm_stats" },    { text: "📣 پیام همگانی",    callback_data: "adm_broadcast" }],
+    [{ text: "🔑 توکن جدید",     callback_data: "adm_token" },    { text: "💳 شماره کارت",     callback_data: "adm_card"      }],
+    [{ text: "💰 افزودن موجودی", callback_data: "adm_addbal" },   { text: "↔️ انتقال اعتبار", callback_data: "adm_transfer"  }],
+    [{ text: "🎫 تیکت‌های باز",  callback_data: "adm_tickets" },  { text: "🚫 لیست مسدودها",  callback_data: "adm_blocked"   }],
+    [{ text: "🔍 جستجوی کاربر",  callback_data: "adm_search"  }],
+    [{ text: "⬅️ بازگشت",        callback_data: "adm_exit"    }],
+  ],
+});
+
+export const adminBackInlineKeyboard = (): InlineKeyboardMarkup => ({
+  inline_keyboard: [[{ text: "⬅️ بازگشت به مدیریت", callback_data: "adm_back_manage" }]],
+});
+
+// ── Inline Keyboards (Shared) ─────────────────────────────────────────────────
 
 export const channelCheckKeyboard = (
   channelUrl: string,

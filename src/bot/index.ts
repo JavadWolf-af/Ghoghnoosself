@@ -1,11 +1,10 @@
 import TelegramBot from "node-telegram-bot-api";
 import { logger } from "../lib/logger";
 import {
-  userMainKeyboard, walletKeyboard, referralKeyboard, profileKeyboard,
-  backKeyboard, adminMainKeyboard, adminManageKeyboard,
-  channelCheckKeyboard, blockedKeyboard, depositReviewKeyboard, unblockKeyboard,
+  userMainInlineKeyboard, walletInlineKeyboard, backToMainInlineKeyboard, backToWalletInlineKeyboard,
+  blockedInlineKeyboard, adminMainInlineKeyboard, adminManageInlineKeyboard, adminBackInlineKeyboard,
+  channelCheckKeyboard, depositReviewKeyboard, unblockKeyboard,
   ticketKeyboard, adminUserActionKeyboard,
-  USER_BUTTONS, WALLET_BUTTONS, ADMIN_BUTTONS, MANAGE_BUTTONS, BACK_BUTTON,
 } from "./keyboards";
 import {
   WELCOME_MESSAGE, MAIN_MENU_MESSAGE, NOT_MEMBER_MESSAGE, MEMBERSHIP_CHECK_FAILED_MESSAGE,
@@ -217,19 +216,19 @@ async function delMsg(chatId: number, msgId: number) {
 // ── توابع ارسال پنل ──────────────────────────────────────────────────────────
 
 async function sendMainMenu(chatId: number, firstName: string): Promise<void> {
-  await sendPanel(chatId, MAIN_MENU_MESSAGE(firstName), { parse_mode: "Markdown", reply_markup: userMainKeyboard() });
+  await sendPanel(chatId, MAIN_MENU_MESSAGE(firstName), { parse_mode: "Markdown", reply_markup: userMainInlineKeyboard() });
 }
 
 async function sendWallet(chatId: number, userId: number): Promise<void> {
-  await sendPanel(chatId, WALLET_MESSAGE(getUserBalance(userId)), { parse_mode: "Markdown", reply_markup: walletKeyboard() });
+  await sendPanel(chatId, WALLET_MESSAGE(getUserBalance(userId)), { parse_mode: "Markdown", reply_markup: walletInlineKeyboard() });
 }
 
 async function sendAdminPanel(chatId: number): Promise<void> {
-  await sendPanel(chatId, ADMIN_PANEL_MESSAGE(), { parse_mode: "Markdown", reply_markup: adminMainKeyboard() });
+  await sendPanel(chatId, ADMIN_PANEL_MESSAGE(), { parse_mode: "Markdown", reply_markup: adminMainInlineKeyboard() });
 }
 
 async function sendAdminManage(chatId: number): Promise<void> {
-  await sendPanel(chatId, ADMIN_MANAGE_MESSAGE(), { parse_mode: "Markdown", reply_markup: adminManageKeyboard() });
+  await sendPanel(chatId, ADMIN_MANAGE_MESSAGE(), { parse_mode: "Markdown", reply_markup: adminManageInlineKeyboard() });
 }
 
 async function notifyAdminsDeposit(
@@ -281,6 +280,14 @@ bot.onText(/\/start(.*)/, async (msg, match) => {
 
     addUser({ id: userId, firstName, lastName: msg.from!.last_name, username: msg.from!.username, referredBy });
 
+    // کیبورد reply قدیمی را یک‌بار پاک کن
+    try {
+      const tmp = await bot.sendMessage(chatId, "‌", {
+        reply_markup: { remove_keyboard: true } as TelegramBot.ReplyKeyboardRemove,
+      });
+      await bot.deleteMessage(chatId, tmp.message_id).catch(() => {});
+    } catch { /* ignore */ }
+
     if (isAdmin(userId)) { await sendAdminPanel(chatId); return; }
 
     if (param === "checked") {
@@ -308,29 +315,96 @@ bot.onText(/\/start(.*)/, async (msg, match) => {
 
 // ── Callback Queries ──────────────────────────────────────────────────────────
 bot.on("callback_query", async (query) => {
-  const adminId = query.from.id;
-  const data    = query.data ?? "";
-  const chatId  = query.message?.chat.id ?? adminId;
-  const msgId   = query.message?.message_id;
+  const userId    = query.from.id;
+  const firstName = query.from.first_name || "کاربر";
+  const data      = query.data ?? "";
+  const chatId    = query.message?.chat.id ?? userId;
+  const msgId     = query.message?.message_id;
 
   await bot.answerCallbackQuery(query.id).catch(() => {});
+
+  // ── ناوبری کاربر (u_*) ───────────────────────────────────────────────────
+  if (data.startsWith("u_")) {
+    if (isUserBlocked(userId)) {
+      if (data === "u_blocked_support") {
+        setPending(userId, "blockedSupport");
+        await sendPanel(chatId, BLOCKED_SUPPORT_PROMPT(), { parse_mode: "Markdown", reply_markup: backToMainInlineKeyboard() });
+      }
+      return;
+    }
+    clearAllPending(userId);
+    if (data === "u_back")        { await sendMainMenu(chatId, firstName); return; }
+    if (data === "u_back_wallet") { await sendWallet(chatId, userId); return; }
+    if (data === "u_wallet")      { await sendWallet(chatId, userId); return; }
+    if (data === "u_referral") {
+      const user = getUser(userId);
+      if (!user) { await sendMainMenu(chatId, firstName); return; }
+      await sendPanel(chatId, REFERRAL_MESSAGE(user, BOT_USERNAME), { parse_mode: "Markdown", reply_markup: backToMainInlineKeyboard() });
+      return;
+    }
+    if (data === "u_profile") {
+      const user = getUser(userId);
+      if (!user) { await sendMainMenu(chatId, firstName); return; }
+      await sendPanel(chatId, PROFILE_MESSAGE(user), { parse_mode: "Markdown", reply_markup: backToMainInlineKeyboard() });
+      return;
+    }
+    if (data === "u_support") {
+      setPending(userId, "support");
+      await sendPanel(chatId, SUPPORT_PROMPT(), { parse_mode: "Markdown", reply_markup: backToMainInlineKeyboard() });
+      return;
+    }
+    if (data === "u_tickets") {
+      const ticket = getOpenTicketByUser(userId);
+      if (!ticket) {
+        await sendPanel(chatId, USER_NO_OPEN_TICKET(), { parse_mode: "Markdown", reply_markup: userMainInlineKeyboard() });
+      } else {
+        await sendPanel(chatId, USER_OPEN_TICKET(ticket.id, ticket.createdAt, ticket.messages), { parse_mode: "Markdown", reply_markup: userMainInlineKeyboard() });
+      }
+      return;
+    }
+    if (data === "u_token") {
+      if (isUserActivated(userId)) {
+        await sendPanel(chatId, TOKEN_ALREADY_ACTIVATED_MESSAGE(), { parse_mode: "Markdown", reply_markup: userMainInlineKeyboard() });
+        return;
+      }
+      setPending(userId, "tokenEntry");
+      await sendPanel(chatId, TOKEN_SECTION_MESSAGE(), { parse_mode: "Markdown", reply_markup: backToMainInlineKeyboard() });
+      return;
+    }
+    if (data === "u_wallet_add") {
+      setPending(userId, "addBalance");
+      await sendPanel(chatId, ADD_BALANCE_AMOUNT_PROMPT(), { parse_mode: "Markdown", reply_markup: backToWalletInlineKeyboard() });
+      return;
+    }
+    if (data === "u_wallet_transfer") {
+      if (getUserBalance(userId) <= 0) {
+        await sendWallet(chatId, userId);
+        await sendTracked(chatId, "❌ موجودی کافی ندارید.", { parse_mode: "Markdown" });
+        return;
+      }
+      setPending(userId, "transferInput");
+      await sendPanel(chatId, TRANSFER_PROMPT(), { parse_mode: "Markdown", reply_markup: backToWalletInlineKeyboard() });
+      return;
+    }
+    return;
+  }
+
+  // ── فقط ادمین ─────────────────────────────────────────────────────────────
+  const adminId = userId;
   if (!isAdmin(adminId)) return;
 
   // ── تیکت: پاسخ ──────────────────────────────────────────────────────────
   if (data.startsWith("tkt_reply:")) {
     const ticketId = data.replace("tkt_reply:", "");
     const ticket   = getSupportTicket(ticketId);
-    if (!ticket) {
-      await sendTracked(chatId, "⚠️ تیکت پیدا نشد.");
-      return;
-    }
+    if (!ticket) { await sendTracked(chatId, "⚠️ تیکت پیدا نشد."); return; }
     if (ticket.status === "closed") {
       await sendTracked(chatId, ADMIN_TICKET_ALREADY_CLOSED(ticketId), { parse_mode: "Markdown" });
       return;
     }
     setPending(adminId, "ticketReply");
     setAdminTicketTarget(adminId, ticketId);
-    await sendPanel(chatId, ADMIN_TICKET_REPLY_PROMPT(ticketId), { parse_mode: "Markdown", reply_markup: backKeyboard() });
+    await sendPanel(chatId, ADMIN_TICKET_REPLY_PROMPT(ticketId), { parse_mode: "Markdown", reply_markup: adminBackInlineKeyboard() });
     return;
   }
 
@@ -338,16 +412,13 @@ bot.on("callback_query", async (query) => {
   if (data.startsWith("tkt_close:")) {
     const ticketId = data.replace("tkt_close:", "");
     const ticket   = getSupportTicket(ticketId);
-    if (!ticket) {
-      await sendTracked(chatId, "⚠️ تیکت پیدا نشد.");
-      return;
-    }
+    if (!ticket) { await sendTracked(chatId, "⚠️ تیکت پیدا نشد."); return; }
     if (!closeSupportTicket(ticketId)) {
       await sendTracked(chatId, ADMIN_TICKET_ALREADY_CLOSED(ticketId), { parse_mode: "Markdown" });
       return;
     }
     await safeSend(
-      () => bot.sendMessage(ticket.userId, TICKET_CLOSED_USER(ticketId), { parse_mode: "Markdown", reply_markup: userMainKeyboard() }),
+      () => bot.sendMessage(ticket.userId, TICKET_CLOSED_USER(ticketId), { parse_mode: "Markdown", reply_markup: userMainInlineKeyboard() }),
       `ticketClose:${ticket.userId}`
     );
     if (msgId) await bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: msgId }).catch(() => {});
@@ -359,13 +430,10 @@ bot.on("callback_query", async (query) => {
   if (data.startsWith("dep_approve:")) {
     const requestId = data.replace("dep_approve:", "");
     const result    = approveBalanceRequest(requestId);
-    if (!result.ok) {
-      await sendTracked(chatId, "⚠️ این درخواست قبلاً پردازش شده است.");
-      return;
-    }
+    if (!result.ok) { await sendTracked(chatId, "⚠️ این درخواست قبلاً پردازش شده است."); return; }
     const newBalance = getUserBalance(result.userId!);
     await safeSend(
-      () => bot.sendMessage(result.userId!, BALANCE_APPROVED_USER(result.amount!, newBalance), { parse_mode: "Markdown", reply_markup: userMainKeyboard() }),
+      () => bot.sendMessage(result.userId!, BALANCE_APPROVED_USER(result.amount!, newBalance), { parse_mode: "Markdown", reply_markup: userMainInlineKeyboard() }),
       `notify:${result.userId}`
     );
     if (msgId) await bot.editMessageCaption(ADMIN_DEPOSIT_APPROVED(requestId), { chat_id: chatId, message_id: msgId, parse_mode: "Markdown" }).catch(() => {});
@@ -376,11 +444,8 @@ bot.on("callback_query", async (query) => {
     const requestId = data.replace("dep_reject:", "");
     const req = getBalanceRequest(requestId);
     const ok  = rejectBalanceRequest(requestId);
-    if (!ok) {
-      await sendTracked(chatId, "⚠️ این درخواست قبلاً پردازش شده است.");
-      return;
-    }
-    if (req) await safeSend(() => bot.sendMessage(req.userId, BALANCE_REJECTED_USER(), { parse_mode: "Markdown", reply_markup: walletKeyboard() }), `reject:${req.userId}`);
+    if (!ok) { await sendTracked(chatId, "⚠️ این درخواست قبلاً پردازش شده است."); return; }
+    if (req) await safeSend(() => bot.sendMessage(req.userId, BALANCE_REJECTED_USER(), { parse_mode: "Markdown", reply_markup: walletInlineKeyboard() }), `reject:${req.userId}`);
     if (msgId) await bot.editMessageCaption(ADMIN_DEPOSIT_REJECTED(requestId), { chat_id: chatId, message_id: msgId, parse_mode: "Markdown" }).catch(() => {});
     return;
   }
@@ -391,7 +456,7 @@ bot.on("callback_query", async (query) => {
     if (!targetUser) { await sendTracked(chatId, ADMIN_USER_NOT_FOUND(), { parse_mode: "Markdown" }); return; }
     setPending(adminId, "adminAddBalance");
     setAdminBalanceTarget(adminId, targetUserId);
-    await sendPanel(chatId, ADMIN_ADD_BALANCE_AMOUNT_PROMPT(targetUser.firstName), { parse_mode: "Markdown", reply_markup: backKeyboard() });
+    await sendPanel(chatId, ADMIN_ADD_BALANCE_AMOUNT_PROMPT(targetUser.firstName), { parse_mode: "Markdown", reply_markup: adminBackInlineKeyboard() });
     return;
   }
 
@@ -399,7 +464,7 @@ bot.on("callback_query", async (query) => {
     const targetUserId = parseInt(data.replace("dep_msg:", ""), 10);
     setPending(adminId, "adminMessageUser");
     setAdminMessageTarget(adminId, targetUserId);
-    await sendPanel(chatId, ADMIN_MSG_PROMPT(), { parse_mode: "Markdown", reply_markup: backKeyboard() });
+    await sendPanel(chatId, ADMIN_MSG_PROMPT(), { parse_mode: "Markdown", reply_markup: adminBackInlineKeyboard() });
     return;
   }
 
@@ -407,7 +472,7 @@ bot.on("callback_query", async (query) => {
     const targetUserId = parseInt(data.replace("dep_block:", ""), 10);
     blockUser(targetUserId);
     const targetUser = getUser(targetUserId);
-    await safeSend(() => bot.sendMessage(targetUserId, BLOCKED_MESSAGE(), { parse_mode: "Markdown", reply_markup: blockedKeyboard() }), `block:${targetUserId}`);
+    await safeSend(() => bot.sendMessage(targetUserId, BLOCKED_MESSAGE(), { parse_mode: "Markdown", reply_markup: blockedInlineKeyboard() }), `block:${targetUserId}`);
     await sendTracked(chatId, ADMIN_USER_BLOCKED(targetUser?.firstName ?? String(targetUserId), targetUserId), { parse_mode: "Markdown", reply_markup: unblockKeyboard(targetUserId) });
     return;
   }
@@ -416,9 +481,94 @@ bot.on("callback_query", async (query) => {
     const targetUserId = parseInt(data.replace("unblock:", ""), 10);
     unblockUser(targetUserId);
     const targetUser = getUser(targetUserId);
-    await safeSend(() => bot.sendMessage(targetUserId, UNBLOCKED_MESSAGE(), { parse_mode: "Markdown", reply_markup: userMainKeyboard() }), `unblock:${targetUserId}`);
+    await safeSend(() => bot.sendMessage(targetUserId, UNBLOCKED_MESSAGE(), { parse_mode: "Markdown", reply_markup: userMainInlineKeyboard() }), `unblock:${targetUserId}`);
     if (msgId) await bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: msgId }).catch(() => {});
-    await sendTracked(chatId, ADMIN_USER_UNBLOCKED(targetUser?.firstName ?? String(targetUserId), targetUserId), { parse_mode: "Markdown", reply_markup: adminManageKeyboard() });
+    await sendTracked(chatId, ADMIN_USER_UNBLOCKED(targetUser?.firstName ?? String(targetUserId), targetUserId), { parse_mode: "Markdown" });
+    return;
+  }
+
+  // ── ناوبری inline پنل ادمین ───────────────────────────────────────────────
+  if (data === "adm_manage") { await sendAdminManage(chatId); return; }
+
+  if (data === "adm_exit") {
+    const u = getUser(adminId);
+    await sendMainMenu(chatId, u?.firstName ?? firstName);
+    return;
+  }
+
+  if (data === "adm_back_manage") {
+    clearAllPending(adminId);
+    await sendAdminManage(chatId);
+    return;
+  }
+
+  if (data === "adm_stats") {
+    await sendAdminManage(chatId);
+    await sendTracked(chatId, STATS_MESSAGE(getUserCount(), getTokenCount(), getUnusedTokenCount(), getOpenTicketsCount()), { parse_mode: "Markdown" });
+    return;
+  }
+
+  if (data === "adm_broadcast") {
+    setPending(adminId, "broadcast");
+    await sendPanel(chatId, BROADCAST_PROMPT(), { parse_mode: "Markdown", reply_markup: adminBackInlineKeyboard() });
+    return;
+  }
+
+  if (data === "adm_token") {
+    const code = createToken(adminId);
+    await sendAdminManage(chatId);
+    await sendTracked(chatId, TOKEN_CREATED_MESSAGE(code), { parse_mode: "Markdown" });
+    return;
+  }
+
+  if (data === "adm_card") {
+    setPending(adminId, "cardNumberInput");
+    await sendPanel(chatId, CARD_NUMBER_PROMPT(), { parse_mode: "Markdown", reply_markup: adminBackInlineKeyboard() });
+    return;
+  }
+
+  if (data === "adm_addbal") {
+    setPending(adminId, "adminAddBalance");
+    await sendPanel(chatId, ADMIN_ADD_BALANCE_PROMPT(), { parse_mode: "Markdown", reply_markup: adminBackInlineKeyboard() });
+    return;
+  }
+
+  if (data === "adm_transfer") {
+    setPending(adminId, "adminTransfer");
+    await sendPanel(chatId, ADMIN_TRANSFER_PROMPT(), { parse_mode: "Markdown", reply_markup: adminBackInlineKeyboard() });
+    return;
+  }
+
+  if (data === "adm_tickets") {
+    const openTickets = getAllOpenTickets();
+    await sendAdminManage(chatId);
+    await sendTracked(chatId, ADMIN_OPEN_TICKETS_HEADER(openTickets.length), { parse_mode: "Markdown" });
+    for (const ticket of openTickets) {
+      const ticketUser = getUser(ticket.userId);
+      const lastMsg    = ticket.messages[ticket.messages.length - 1]!;
+      await sendTracked(
+        chatId,
+        ADMIN_OPEN_TICKET_ITEM(ticket.id, ticket.userId, ticketUser?.firstName ?? String(ticket.userId), ticketUser?.username, ticket.createdAt, ticket.messages.length, lastMsg.from, lastMsg.text),
+        { parse_mode: "Markdown", reply_markup: ticketKeyboard(ticket.id) }
+      );
+      await new Promise((r) => setTimeout(r, 80));
+    }
+    return;
+  }
+
+  if (data === "adm_blocked") {
+    const blockedUsers = getBlockedUsers();
+    await sendAdminManage(chatId);
+    await sendTracked(chatId, BLOCKED_LIST_MESSAGE(blockedUsers), { parse_mode: "Markdown" });
+    for (const u of blockedUsers) {
+      await sendTracked(chatId, `👤 *${u.firstName}*${u.username ? ` (@${u.username})` : ""} — \`${u.id}\``, { parse_mode: "Markdown", reply_markup: unblockKeyboard(u.id) });
+    }
+    return;
+  }
+
+  if (data === "adm_search") {
+    setPending(adminId, "adminSearchUser");
+    await sendPanel(chatId, ADMIN_SEARCH_USER_PROMPT(), { parse_mode: "Markdown", reply_markup: adminBackInlineKeyboard() });
     return;
   }
 });
