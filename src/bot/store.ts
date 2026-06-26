@@ -21,6 +21,8 @@ export interface UserRecord {
   phoneNumber?: string;
   tgApiId?: number;
   tgApiHash?: string;
+  tgSession?: string;
+  clockEnabled: boolean;
 }
 
 export interface TokenRecord {
@@ -82,6 +84,8 @@ function rowToUser(r: typeof users.$inferSelect): UserRecord {
     phoneNumber: r.phoneNumber ?? undefined,
     tgApiId: r.tgApiId ?? undefined,
     tgApiHash: r.tgApiHash ?? undefined,
+    tgSession: r.tgSession ?? undefined,
+    clockEnabled: r.clockEnabled ?? false,
   };
 }
 
@@ -470,7 +474,7 @@ type PendingSet =
   | "cardNumberInput" | "cardHolderInput" | "cardBankInput"
   | "adminTransfer" | "adminAddBalance" | "adminAddBalanceAmount"
   | "adminMessageUser" | "support" | "blockedSupport" | "ticketReply" | "adminSearchUser"
-  | "tokenCostInput";
+  | "tokenCostInput" | "telegramPhone" | "telegramCode" | "userbotCode";
 
 const SETS: Record<PendingSet, Set<number>> = {
   broadcast: new Set(), tokenEntry: new Set(), addBalance: new Set(),
@@ -479,6 +483,7 @@ const SETS: Record<PendingSet, Set<number>> = {
   adminAddBalance: new Set(), adminAddBalanceAmount: new Set(), adminMessageUser: new Set(),
   support: new Set(), blockedSupport: new Set(), ticketReply: new Set(),
   adminSearchUser: new Set(), tokenCostInput: new Set(),
+  telegramPhone: new Set(), telegramCode: new Set(), userbotCode: new Set(),
 };
 
 const addBalanceData     = new Map<number, { amount: number; receiptId: string }>();
@@ -704,4 +709,33 @@ export async function getUserApiCredentials(
     tgApiId:     row?.tgApiId ?? null,
     tgApiHash:   row?.tgApiHash ?? null,
   };
+}
+
+// ── Userbot Session & Clock ────────────────────────────────────────────────────
+
+export async function saveUserSession(userId: number, session: string): Promise<void> {
+  await db.update(users).set({ tgSession: session }).where(eq(users.id, userId));
+}
+
+export async function getUserSession(userId: number): Promise<string | null> {
+  const [row] = await db.select({ tgSession: users.tgSession }).from(users).where(eq(users.id, userId));
+  return row?.tgSession ?? null;
+}
+
+export async function setClockEnabled(userId: number, enabled: boolean): Promise<void> {
+  await db.update(users).set({ clockEnabled: enabled }).where(eq(users.id, userId));
+}
+
+export async function getClockEnabled(userId: number): Promise<boolean> {
+  const [row] = await db.select({ clockEnabled: users.clockEnabled }).from(users).where(eq(users.id, userId));
+  return row?.clockEnabled ?? false;
+}
+
+export async function getClockEnabledUsers(): Promise<Array<{
+  id: number; tgApiId: number | null; tgApiHash: string | null; tgSession: string | null;
+}>> {
+  const rows = await db.select({
+    id: users.id, tgApiId: users.tgApiId, tgApiHash: users.tgApiHash, tgSession: users.tgSession,
+  }).from(users).where(eq(users.clockEnabled, true));
+  return rows;
 }

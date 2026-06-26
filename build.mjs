@@ -20,7 +20,7 @@ async function buildAll() {
     outdir: distDir,
     outExtension: { ".js": ".mjs" },
     logLevel: "info",
-    external: ["*.node", "bufferutil", "utf-8-validate"],
+    external: ["*.node", "bufferutil", "utf-8-validate", "telegram"],
     sourcemap: "linked",
     plugins: [esbuildPluginPino({ transports: ["pino-pretty"] })],
     banner: {

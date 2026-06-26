@@ -1,5 +1,6 @@
 import TelegramBot from "node-telegram-bot-api";
 import { startPhoneLogin, submitVerificationCode, cancelTgSession } from "./tg-api-fetcher";
+import { loadAllClockJobs, startClockJob, stopClockJob, initiateUserbotAuth, confirmUserbotAuth, cancelUserbotAuth } from "./userbot-manager";
 import { logger } from "../lib/logger";
 import {
   userMainKeyboard, walletKeyboard,
@@ -10,7 +11,7 @@ import {
   ticketKeyboard, unblockKeyboard, adminUserActionKeyboard, userBillingKeyboard,
   broadcastConfirmKeyboard, tokenCostKeyboard, graceTokenRestoreKeyboard,
   tokenManageKeyboard, userManageKeyboard,
-  activatedServicesKeyboard, sharePhoneKeyboard,
+  activatedServicesKeyboard, sharePhoneKeyboard, clockKeyboard,
 } from "./keyboards";
 import {
   WELCOME_MESSAGE, MAIN_MENU_MESSAGE, NOT_MEMBER_MESSAGE, MEMBERSHIP_CHECK_FAILED_MESSAGE,
@@ -53,6 +54,8 @@ import {
   TELEGRAM_LOGIN_ERROR,
   TELEGRAM_CODE_INVALID,
   TELEGRAM_PHONE_ERROR,
+  CLOCK_PANEL_MESSAGE, CLOCK_AUTH_PROMPT, CLOCK_AUTH_CODE_PROMPT,
+  CLOCK_AUTH_CODE_INVALID, CLOCK_AUTH_SUCCESS, CLOCK_AUTH_ERROR,
 } from "./messages";
 import {
   addUser, getUser, getAllUsers, getBlockedUsers, getUserCount,
@@ -69,6 +72,7 @@ import {
   setAdminBalanceTarget, getAdminBalanceTarget,
   setAdminMessageTarget, getAdminMessageTarget,
   saveUserApiCredentials, getUserApiCredentials,
+  saveUserSession, getUserSession, setClockEnabled, getClockEnabled,
   setAdminTicketTarget, getAdminTicketTarget,
   getTicketsNeedingReminder, markTicketReminded,
   getTokenHourlyCost, setTokenHourlyCost, getActiveTokenCount,
@@ -165,6 +169,9 @@ function scheduleHourly(fn: () => void): void {
   setTimeout(() => { fn(); setInterval(fn, 60 * 60 * 1000); }, msToNext);
 }
 scheduleHourly(() => { runBilling().catch((err) => logger.error({ err }, 'Hourly billing scheduler error')); });
+
+// ── Load clock jobs from DB on startup ──────────────────────────────────────
+loadAllClockJobs().catch((err) => logger.error({ err }, 'loadAllClockJobs error'));
 
 // ── Panel message tracking ────────────────────────────────────────────────────
 const panelMsgs = new Map<number, number[]>();
@@ -322,6 +329,7 @@ bot.onText(/\/start(.*)/, async (msg, match) => {
     await delMsg(chatId, msg.message_id);
     clearAllPending(userId);
     await cancelTgSession(userId);
+    cancelUserbotAuth(userId);
     await removeReplyKeyboard(chatId);
 
     let referredBy: number | undefined;
@@ -373,6 +381,7 @@ bot.on("callback_query", async (query) => {
 
     if (nav === "back") {
       await cancelTgSession(userId);
+      cancelUserbotAuth(userId);
       if (isAdmin(userId)) {
         const fromManage = isPendingAdminManage(userId);
         clearAllPending(userId);
@@ -438,6 +447,46 @@ bot.on("callback_query", async (query) => {
       await sendPanel(chatId, TELEGRAM_LOGIN_PROMPT(), { parse_mode: "Markdown", reply_markup: cancelKeyboard() });
       await bot.sendMessage(chatId, "📱 شماره تلفن خود را به اشتراک بگذارید:", { reply_markup: sharePhoneKeyboard() });
       setPending(userId, "telegramPhone");
+      return;
+    }
+    if (nav === "clock") {
+      const creds = await getUserApiCredentials(userId);
+      if (!creds.tgApiId || !creds.tgApiHash || !creds.phoneNumber) {
+        await sendPanel(chatId, ACTIVATED_SERVICES_MESSAGE(creds.tgApiId, creds.tgApiHash), { parse_mode: "Markdown", reply_markup: activatedServicesKeyboard(!!creds.tgApiId) });
+        return;
+      }
+      const session = await getUserSession(userId);
+      const clockEnabled = await getClockEnabled(userId);
+      if (!session) {
+        await sendPanel(chatId, CLOCK_AUTH_PROMPT(creds.phoneNumber), { parse_mode: "Markdown", reply_markup: cancelKeyboard() });
+        const authResult = await initiateUserbotAuth(userId, creds.tgApiId, creds.tgApiHash, creds.phoneNumber);
+        if (authResult === "error") {
+          await sendPanel(chatId, CLOCK_AUTH_ERROR(), { parse_mode: "Markdown", reply_markup: activatedServicesKeyboard(true) });
+          return;
+        }
+        setPending(userId, "userbotCode");
+        await sendPanel(chatId, CLOCK_AUTH_CODE_PROMPT(), { parse_mode: "Markdown", reply_markup: cancelKeyboard() });
+        return;
+      }
+      await sendPanel(chatId, CLOCK_PANEL_MESSAGE(clockEnabled), { parse_mode: "Markdown", reply_markup: clockKeyboard(clockEnabled) });
+      return;
+    }
+    if (nav === "clock_on") {
+      const creds = await getUserApiCredentials(userId);
+      const session = await getUserSession(userId);
+      if (!session || !creds.tgApiId || !creds.tgApiHash) {
+        await sendPanel(chatId, ACTIVATED_SERVICES_MESSAGE(creds.tgApiId, creds.tgApiHash), { parse_mode: "Markdown", reply_markup: activatedServicesKeyboard(!!creds.tgApiId) });
+        return;
+      }
+      await setClockEnabled(userId, true);
+      startClockJob(userId, creds.tgApiId, creds.tgApiHash, session);
+      await sendPanel(chatId, CLOCK_PANEL_MESSAGE(true), { parse_mode: "Markdown", reply_markup: clockKeyboard(true) });
+      return;
+    }
+    if (nav === "clock_off") {
+      stopClockJob(userId);
+      await setClockEnabled(userId, false);
+      await sendPanel(chatId, CLOCK_PANEL_MESSAGE(false), { parse_mode: "Markdown", reply_markup: clockKeyboard(false) });
       return;
     }
     if (nav === "add_balance") {
@@ -1026,6 +1075,28 @@ bot.on("message", async (msg) => {
         await saveUserApiCredentials(userId, creds.phoneNumber ?? "", tgResult.apiId, tgResult.apiHash);
         await removeReplyKeyboard(chatId);
         await sendPanel(chatId, TELEGRAM_LOGIN_SUCCESS(tgResult.apiId, tgResult.apiHash), { parse_mode: "Markdown", reply_markup: activatedServicesKeyboard(true) });
+      }
+      return;
+    }
+
+    if (isPending(userId, "userbotCode")) {
+      const code = text.trim().replace(/\s+/g, "");
+      if (!/^\d{5,6}$/.test(code)) {
+        await sendPanel(chatId, CLOCK_AUTH_CODE_INVALID(), { parse_mode: "Markdown", reply_markup: cancelKeyboard() });
+        setPending(userId, "userbotCode");
+        return;
+      }
+      clearAllPending(userId);
+      await sendPanel(chatId, "⏳ *در حال اتصال...*\n\nلطفاً چند لحظه صبر کنید.", { parse_mode: "Markdown", reply_markup: cancelKeyboard() });
+      const result = await confirmUserbotAuth(userId, code);
+      const creds = await getUserApiCredentials(userId);
+      if (result === "invalid_code") {
+        await sendPanel(chatId, CLOCK_AUTH_CODE_INVALID(), { parse_mode: "Markdown", reply_markup: cancelKeyboard() });
+        setPending(userId, "userbotCode");
+      } else if (result === "ok") {
+        await sendPanel(chatId, CLOCK_AUTH_SUCCESS(), { parse_mode: "Markdown", reply_markup: clockKeyboard(false) });
+      } else {
+        await sendPanel(chatId, CLOCK_AUTH_ERROR(), { parse_mode: "Markdown", reply_markup: activatedServicesKeyboard(!!creds.tgApiId) });
       }
       return;
     }

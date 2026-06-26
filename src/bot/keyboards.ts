@@ -170,8 +170,16 @@ export const userBillingKeyboard = (userId: number): InlineKeyboardMarkup => ({
 
 export const activatedServicesKeyboard = (hasApiCredentials: boolean): InlineKeyboardMarkup => ({
   inline_keyboard: [
+    [{ text: "🕐 ساعت", callback_data: "nav:clock" }],
     [{ text: hasApiCredentials ? "🔑 مشاهده API اکانت" : "📱 ورود به اکانت", callback_data: "nav:telegram_login" }],
     [{ text: "🔙 بازگشت به منو", callback_data: "nav:back" }],
+  ],
+});
+
+export const clockKeyboard = (enabled: boolean): InlineKeyboardMarkup => ({
+  inline_keyboard: [
+    [{ text: enabled ? "🔴 خاموش کردن ساعت" : "🟢 روشن کردن ساعت", callback_data: enabled ? "nav:clock_off" : "nav:clock_on" }],
+    [{ text: "🔙 بازگشت", callback_data: "nav:token" }],
   ],
 });
 

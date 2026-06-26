@@ -19,6 +19,8 @@ export const users = pgTable("users", {
   phoneNumber:  varchar("phone_number", { length: 32 }),
   tgApiId:      integer("tg_api_id"),
   tgApiHash:    varchar("tg_api_hash", { length: 64 }),
+  tgSession:    text("tg_session"),
+  clockEnabled: boolean("clock_enabled").notNull().default(false),
 });
 
 export const tokens = pgTable("tokens", {
@@ -28,7 +30,6 @@ export const tokens = pgTable("tokens", {
   isUsed:          boolean("is_used").notNull().default(false),
   usedByUserId:    bigint("used_by_user_id", { mode: "number" }),
   usedAt:          timestamp("used_at"),
-  // billing status: 'active' | 'grace' | 'expired'
   status:          varchar("status", { length: 16 }).notNull().default("active"),
   graceStartedAt:  timestamp("grace_started_at"),
 });
