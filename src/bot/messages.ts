@@ -267,3 +267,20 @@ export const ADMIN_TRANSFER_PROMPT = (): string =>
 
 export const ADMIN_TRANSFER_SUCCESS = (from: number, to: number, amount: number): string =>
   `✅ *انتقال موفق*\n\n${amount.toLocaleString("fa-IR")} تومان از \`${from}\` به \`${to}\` منتقل شد.`;
+
+// ── Ticket Reminder ───────────────────────────────────────────────────────────
+
+export const ADMIN_TICKET_REMINDER = (
+  ticketId: string,
+  userId: number,
+  firstName: string,
+  username: string | undefined,
+  lastMessageText: string,
+  waitHours: number,
+): string =>
+  `⏰ *یادآوری تیکت بی‌پاسخ*\n\n` +
+  `🎫 تیکت: \`${ticketId}\`\n` +
+  `👤 کاربر: *${firstName}*${username ? ` (@${username})` : ""}\n` +
+  `🔢 آیدی: \`${userId}\`\n` +
+  `🕐 بیش از *${waitHours} ساعت* بدون پاسخ\n\n` +
+  `💬 آخرین پیام کاربر:\n_${lastMessageText.slice(0, 200)}${lastMessageText.length > 200 ? "…" : ""}_`;
