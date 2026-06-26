@@ -8,6 +8,7 @@ import {
   depositReviewKeyboard, depositReviewWithRestoreKeyboard,
   ticketKeyboard, unblockKeyboard, adminUserActionKeyboard,
   broadcastConfirmKeyboard, tokenCostKeyboard, graceTokenRestoreKeyboard,
+  tokenManageKeyboard, userManageKeyboard,
 } from "./keyboards";
 import {
   WELCOME_MESSAGE, MAIN_MENU_MESSAGE, NOT_MEMBER_MESSAGE, MEMBERSHIP_CHECK_FAILED_MESSAGE,
@@ -427,6 +428,14 @@ bot.on("callback_query", async (query) => {
     // Admin nav
     if (isAdmin(userId)) {
       if (nav === "admin_manage") { await sendAdminManage(chatId); return; }
+      if (nav === "admin_token_manage") {
+        await sendPanel(chatId, "🔑 *مدیریت توکن*\n\n━━━━━━━━━━━━━━━━━\nیک گزینه را انتخاب کنید:", { parse_mode: "Markdown", reply_markup: tokenManageKeyboard() });
+        return;
+      }
+      if (nav === "admin_user_manage") {
+        await sendPanel(chatId, "👥 *مدیریت کاربران*\n\n━━━━━━━━━━━━━━━━━\nیک گزینه را انتخاب کنید:", { parse_mode: "Markdown", reply_markup: userManageKeyboard() });
+        return;
+      }
       if (nav === "admin_stats") {
         const [userCount, tokenCount, unusedCount, openTickets] = await Promise.all([
           getUserCount(), getTokenCount(), getUnusedTokenCount(), getOpenTicketsCount(),
