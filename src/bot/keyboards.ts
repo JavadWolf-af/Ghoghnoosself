@@ -38,7 +38,26 @@ export const MANAGE_BUTTONS = {
   BACK:          BACK_BUTTON,
 };
 
-// ── Reply Keyboards ───────────────────────────────────────────────────────────
+export const ADMIN_DEPOSIT_ACTIONS = {
+  APPROVE: "✅ تأیید واریز",
+  REJECT:  "❌ رد درخواست",
+  MESSAGE: "💬 پیام به کاربر",
+  BLOCK:   "⛔️ مسدود کردن",
+};
+
+export const ADMIN_TICKET_ACTIONS = {
+  REPLY: "✏️ پاسخ دادن",
+  CLOSE: "🔒 بستن تیکت",
+};
+
+export const ADMIN_USER_ACTIONS = {
+  ADD_BALANCE: "💰 افزودن موجودی",
+  MESSAGE:     "💬 پیام به کاربر",
+  BLOCK:       "⛔️ مسدود کردن",
+  UNBLOCK:     "🔓 رفع مسدودیت",
+};
+
+// ── Reply Keyboards (User) ────────────────────────────────────────────────────
 
 export const userMainKeyboard = (): ReplyKeyboardMarkup => ({
   keyboard: [
@@ -77,6 +96,8 @@ export const backKeyboard = (): ReplyKeyboardMarkup => ({
   resize_keyboard: true,
 });
 
+// ── Reply Keyboards (Admin) ───────────────────────────────────────────────────
+
 export const adminMainKeyboard = (): ReplyKeyboardMarkup => ({
   keyboard: [
     [{ text: ADMIN_BUTTONS.MENU_MANAGE }],
@@ -97,7 +118,33 @@ export const adminManageKeyboard = (): ReplyKeyboardMarkup => ({
   resize_keyboard: true,
 });
 
-// ── Inline Keyboards ──────────────────────────────────────────────────────────
+export const adminDepositReviewKeyboard = (): ReplyKeyboardMarkup => ({
+  keyboard: [
+    [{ text: ADMIN_DEPOSIT_ACTIONS.APPROVE }, { text: ADMIN_DEPOSIT_ACTIONS.REJECT }],
+    [{ text: ADMIN_DEPOSIT_ACTIONS.MESSAGE }, { text: ADMIN_DEPOSIT_ACTIONS.BLOCK }],
+    [{ text: BACK_BUTTON }],
+  ],
+  resize_keyboard: true,
+});
+
+export const adminTicketActionKeyboard = (): ReplyKeyboardMarkup => ({
+  keyboard: [
+    [{ text: ADMIN_TICKET_ACTIONS.REPLY }, { text: ADMIN_TICKET_ACTIONS.CLOSE }],
+    [{ text: BACK_BUTTON }],
+  ],
+  resize_keyboard: true,
+});
+
+export const adminUserActionKeyboard = (isBlocked: boolean): ReplyKeyboardMarkup => ({
+  keyboard: [
+    [{ text: ADMIN_USER_ACTIONS.ADD_BALANCE }, { text: ADMIN_USER_ACTIONS.MESSAGE }],
+    [{ text: isBlocked ? ADMIN_USER_ACTIONS.UNBLOCK : ADMIN_USER_ACTIONS.BLOCK }],
+    [{ text: BACK_BUTTON }],
+  ],
+  resize_keyboard: true,
+});
+
+// ── Inline Keyboard (URL-only — cannot be a Reply Keyboard) ──────────────────
 
 export const channelCheckKeyboard = (
   channelUrl: string,
@@ -106,45 +153,5 @@ export const channelCheckKeyboard = (
   inline_keyboard: [
     [{ text: "📢 عضویت در کانال", url: channelUrl }],
     [{ text: "✅ عضو شدم — بررسی کن", url: `https://t.me/${botUsername}?start=checked` }],
-  ],
-});
-
-export const depositReviewKeyboard = (requestId: string, userId: number): InlineKeyboardMarkup => ({
-  inline_keyboard: [
-    [
-      { text: "✅ تأیید واریز",    callback_data: `dep_approve:${requestId}` },
-      { text: "❌ رد درخواست",     callback_data: `dep_reject:${requestId}` },
-    ],
-    [
-      { text: "💬 پیام به کاربر", callback_data: `dep_msg:${userId}` },
-      { text: "⛔️ مسدود کردن",   callback_data: `dep_block:${userId}` },
-    ],
-  ],
-});
-
-export const unblockKeyboard = (userId: number): InlineKeyboardMarkup => ({
-  inline_keyboard: [[
-    { text: "🔓 رفع مسدودیت", callback_data: `unblock:${userId}` },
-  ]],
-});
-
-export const ticketKeyboard = (ticketId: string): InlineKeyboardMarkup => ({
-  inline_keyboard: [[
-    { text: "✏️ پاسخ دادن", callback_data: `tkt_reply:${ticketId}` },
-    { text: "🔒 بستن تیکت", callback_data: `tkt_close:${ticketId}` },
-  ]],
-});
-
-export const adminUserActionKeyboard = (userId: number, isBlocked: boolean): InlineKeyboardMarkup => ({
-  inline_keyboard: [
-    [
-      { text: "💰 افزودن موجودی",  callback_data: `usr_addbal:${userId}` },
-      { text: "💬 پیام به کاربر",  callback_data: `dep_msg:${userId}` },
-    ],
-    [
-      isBlocked
-        ? { text: "🔓 رفع مسدودیت", callback_data: `unblock:${userId}` }
-        : { text: "⛔️ مسدود کردن",  callback_data: `dep_block:${userId}` },
-    ],
   ],
 });
