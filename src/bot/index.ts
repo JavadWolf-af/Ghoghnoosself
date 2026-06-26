@@ -37,6 +37,7 @@ import {
   USER_NO_OPEN_TICKET, USER_OPEN_TICKET,
   ADMIN_OPEN_TICKETS_HEADER, ADMIN_OPEN_TICKET_ITEM,
   ADMIN_SEARCH_USER_PROMPT, ADMIN_SEARCH_USER_NOT_FOUND, ADMIN_USER_PROFILE_ADMIN,
+  ADMIN_USER_BILLING_DASHBOARD,
   ADMIN_TOKEN_COST_MESSAGE, TOKEN_COST_PROMPT, TOKEN_COST_SET,
   BALANCE_LOW_WARNING, BALANCE_CRITICAL_WARNING,
   TOKEN_GRACE_STARTED, TOKEN_GRACE_REMINDER, TOKEN_EXPIRED_NOTIFY,
@@ -634,6 +635,27 @@ bot.on("callback_query", async (query) => {
       setAdminMessageTarget(userId, targetId);
       setPending(userId, "adminMessageUser");
       await sendPanel(chatId, ADMIN_MSG_PROMPT(), { parse_mode: "Markdown", reply_markup: cancelKeyboard() });
+      return;
+    }
+    if (data.startsWith("user:billing:")) {
+      const targetId = parseInt(data.replace("user:billing:", ""), 10);
+      const [target, hourlyCost, token] = await Promise.all([
+        getUser(targetId),
+        getTokenHourlyCost(),
+        getTokenByUserId(targetId),
+      ]);
+      if (!target) {
+        await sendTracked(chatId, ADMIN_USER_NOT_FOUND(), { parse_mode: "Markdown" });
+        return;
+      }
+      const dash = ADMIN_USER_BILLING_DASHBOARD(
+        target, hourlyCost,
+        token ? (token.status as "active" | "grace" | "expired") : "none",
+        token?.code,
+        token?.usedAt,
+        token?.graceStartedAt,
+      );
+      await sendTracked(chatId, dash, { parse_mode: "Markdown", reply_markup: adminUserActionKeyboard(targetId, target.isBlocked) });
       return;
     }
     if (data.startsWith("user:addbal:")) {
