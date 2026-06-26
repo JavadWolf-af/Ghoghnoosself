@@ -1,15 +1,25 @@
 import type { UserRecord } from "./store";
 
+/**
+ * Escape special characters for Telegram's legacy Markdown parse mode.
+ * Must be applied to ALL user-controlled strings before interpolation.
+ * Special chars in legacy Markdown: _ * ` [
+ */
+export function esc(s: string | undefined): string {
+  if (!s) return "";
+  return s.replace(/[_*`[]/g, "\\$&");
+}
+
 // ── Welcome & Navigation ──────────────────────────────────────────────────────
 
 export const WELCOME_MESSAGE = (firstName: string): string =>
-  `✨ *${firstName}* عزیز، خوش آمدی!\n\n` +
+  `✨ *${esc(firstName)}* عزیز، خوش آمدی!\n\n` +
   `به ربات سلف خوش آمدید 🎉\n\n` +
   `━━━━━━━━━━━━━━━━━\n` +
   `📢 برای استفاده از امکانات، ابتدا در کانال ما عضو شوید:`;
 
 export const MAIN_MENU_MESSAGE = (firstName: string): string =>
-  `👋 *${firstName}* خوش آمدی!\n\n` +
+  `👋 *${esc(firstName)}* خوش آمدی!\n\n` +
   `از منوی پایین یک گزینه انتخاب کن 👇`;
 
 export const NOT_MEMBER_MESSAGE = (): string =>
@@ -54,7 +64,7 @@ export const TICKET_REPLY_USER = (ticketId: string, replyText: string): string =
   `💬 *پاسخ پشتیبانی*\n\n` +
   `━━━━━━━━━━━━━━━━━\n` +
   `🎫 تیکت: \`${ticketId}\`\n\n` +
-  `${replyText}`;
+  `${esc(replyText)}`;
 
 export const TICKET_CLOSED_USER = (ticketId: string): string =>
   `🔒 *تیکت بسته شد*\n\n` +
@@ -76,9 +86,9 @@ export const ADMIN_NEW_TICKET = (
   `🎫 *تیکت جدید*\n\n` +
   `━━━━━━━━━━━━━━━━━\n` +
   `🆔 شماره: \`${ticketId}\`\n` +
-  `👤 کاربر: *${firstName}*${username ? ` (@${username})` : ""}\n` +
+  `👤 کاربر: *${esc(firstName)}*${username ? ` (@${esc(username)})` : ""}\n` +
   `🔢 آیدی: \`${userId}\`\n\n` +
-  `💬 *پیام:*\n${text}`;
+  `💬 *پیام:*\n${esc(text)}`;
 
 export const ADMIN_TICKET_FOLLOWUP = (
   ticketId: string, userId: number, firstName: string,
@@ -87,9 +97,9 @@ export const ADMIN_TICKET_FOLLOWUP = (
   `📩 *پیام جدید در تیکت*\n\n` +
   `━━━━━━━━━━━━━━━━━\n` +
   `🆔 شماره: \`${ticketId}\`\n` +
-  `👤 کاربر: *${firstName}*${username ? ` (@${username})` : ""}\n` +
+  `👤 کاربر: *${esc(firstName)}*${username ? ` (@${esc(username)})` : ""}\n` +
   `🔢 آیدی: \`${userId}\`\n\n` +
-  `💬 *پیام:*\n${text}`;
+  `💬 *پیام:*\n${esc(text)}`;
 
 export const ADMIN_TICKET_REPLY_PROMPT = (ticketId: string): string =>
   `✏️ *پاسخ به تیکت*\n\n` +
@@ -139,7 +149,7 @@ export const TOKEN_ALREADY_ACTIVATED_MESSAGE = (): string =>
   `قبلاً توکن خود را فعال کرده‌اید.\nبه تمام امکانات دسترسی دارید 🎉`;
 
 export const TOKEN_SUCCESS_MESSAGE = (firstName: string): string =>
-  `🎉 *تبریک ${firstName} عزیز!*\n\n` +
+  `🎉 *تبریک ${esc(firstName)} عزیز!*\n\n` +
   `━━━━━━━━━━━━━━━━━\n` +
   `توکن شما با موفقیت فعال شد! 🚀\nاکنون به امکانات ویژه دسترسی دارید.`;
 
@@ -245,8 +255,8 @@ export const PROFILE_MESSAGE = (user: UserRecord): string =>
   `👤 *پروفایل*\n\n` +
   `━━━━━━━━━━━━━━━━━\n` +
   `🆔 شناسه: \`${user.id}\`\n` +
-  `📛 نام: *${user.firstName}${user.lastName ? " " + user.lastName : ""}*\n` +
-  (user.username ? `🔖 یوزرنیم: @${user.username}\n` : "") +
+  `📛 نام: *${esc(user.firstName)}${user.lastName ? " " + esc(user.lastName) : ""}*\n` +
+  (user.username ? `🔖 یوزرنیم: @${esc(user.username)}\n` : "") +
   `📅 عضویت: ${user.joinedAt.toLocaleDateString("fa-IR")}\n` +
   `💎 موجودی: *${user.balance.toLocaleString("fa-IR")} تومان*\n` +
   `👥 زیرمجموعه: *${user.referralCount}* نفر`;
@@ -284,7 +294,7 @@ export const BLOCKED_LIST_MESSAGE = (
 ): string => {
   if (blockedUsers.length === 0) return `✅ هیچ کاربر مسدودی وجود ندارد.`;
   const lines = blockedUsers.map((u, i) =>
-    `${i + 1}. *${u.firstName}*${u.username ? ` (@${u.username})` : ""} — \`${u.id}\``
+    `${i + 1}. *${esc(u.firstName)}*${u.username ? ` (@${esc(u.username)})` : ""} — \`${u.id}\``
   );
   return (
     `🚫 *لیست مسدودها* (${blockedUsers.length} نفر)\n\n` +
@@ -300,7 +310,7 @@ export const ADMIN_DEPOSIT_REVIEW = (
   `📥 *درخواست افزایش موجودی*\n\n` +
   `━━━━━━━━━━━━━━━━━\n` +
   `🆔 شناسه: \`${requestId}\`\n` +
-  `👤 کاربر: *${firstName}*${username ? ` (@${username})` : ""}\n` +
+  `👤 کاربر: *${esc(firstName)}*${username ? ` (@${esc(username)})` : ""}\n` +
   `🔢 آیدی: \`${userId}\`\n` +
   `💵 مبلغ: *${amount.toLocaleString("fa-IR")} تومان*\n\n` +
   `رسید واریز را بالا مشاهده کنید 👆`;
@@ -310,9 +320,9 @@ export const ADMIN_SUPPORT_FROM_BLOCKED = (
 ): string =>
   `🎧 *پشتیبانی — کاربر مسدود*\n\n` +
   `━━━━━━━━━━━━━━━━━\n` +
-  `👤 کاربر: *${firstName}*${username ? ` (@${username})` : ""}\n` +
+  `👤 کاربر: *${esc(firstName)}*${username ? ` (@${esc(username)})` : ""}\n` +
   `🔢 آیدی: \`${userId}\`\n\n` +
-  `💬 *پیام:*\n${text}`;
+  `💬 *پیام:*\n${esc(text)}`;
 
 export const ADMIN_ADD_BALANCE_PROMPT = (): string =>
   `💰 *افزودن موجودی*\n\n` +
@@ -321,14 +331,14 @@ export const ADMIN_ADD_BALANCE_PROMPT = (): string =>
   `↩️ برای انصراف 🔙 را بزنید`;
 
 export const ADMIN_ADD_BALANCE_AMOUNT_PROMPT = (firstName: string): string =>
-  `👤 کاربر: *${firstName}*\n\n` +
+  `👤 کاربر: *${esc(firstName)}*\n\n` +
   `━━━━━━━━━━━━━━━━━\n` +
   `مقدار افزایش موجودی را *به تومان* وارد کنید:\n\n` +
   `↩️ برای انصراف 🔙 را بزنید`;
 
 export const ADMIN_BALANCE_ADDED = (firstName: string, userId: number, amount: number): string =>
   `✅ *موجودی افزایش یافت*\n\n` +
-  `👤 کاربر: *${firstName}* (\`${userId}\`)\n` +
+  `👤 کاربر: *${esc(firstName)}* (\`${userId}\`)\n` +
   `💵 مبلغ: *${amount.toLocaleString("fa-IR")} تومان*`;
 
 export const ADMIN_USER_NOT_FOUND = (): string =>
@@ -353,10 +363,10 @@ export const ADMIN_DEPOSIT_REJECTED = (requestId: string): string =>
   `❌ درخواست \`${requestId}\` رد شد.`;
 
 export const ADMIN_USER_BLOCKED = (firstName: string, userId: number): string =>
-  `⛔️ کاربر *${firstName}* (\`${userId}\`) مسدود شد.`;
+  `⛔️ کاربر *${esc(firstName)}* (\`${userId}\`) مسدود شد.`;
 
 export const ADMIN_USER_UNBLOCKED = (firstName: string, userId: number): string =>
-  `✅ کاربر *${firstName}* (\`${userId}\`) آزاد شد.`;
+  `✅ کاربر *${esc(firstName)}* (\`${userId}\`) آزاد شد.`;
 
 export const ADMIN_TRANSFER_PROMPT = (): string =>
   `↔️ *انتقال اعتبار کاربر*\n\n` +
@@ -382,8 +392,8 @@ export const ADMIN_TICKET_REMINDER = (
   `⏰ *یادآوری — تیکت بی‌پاسخ*\n\n` +
   `━━━━━━━━━━━━━━━━━\n` +
   `🎫 تیکت: \`${ticketId}\`\n` +
-  `👤 کاربر: *${firstName}*${username ? ` (@${username})` : ""}\n` +
+  `👤 کاربر: *${esc(firstName)}*${username ? ` (@${esc(username)})` : ""}\n` +
   `🔢 آیدی: \`${userId}\`\n` +
   `🕐 بیش از *${waitHours} ساعت* بدون پاسخ\n\n` +
   `━━━━━━━━━━━━━━━━━\n` +
-  `💬 *آخرین پیام:*\n_${lastMessageText.slice(0, 200)}${lastMessageText.length > 200 ? "…" : ""}_`;
+  `💬 *آخرین پیام:*\n_${esc(lastMessageText).slice(0, 200)}${lastMessageText.length > 200 ? "…" : ""}_`;
