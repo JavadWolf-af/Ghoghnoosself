@@ -173,7 +173,7 @@ NODE_BIN="$(command -v node)"
 
 setup_systemd() {
   command -v systemctl &>/dev/null || return 1
-  printf '[Unit]\nDescription=Ghoghnoosself Telegram Bot\nAfter=network-online.target postgresql.service\nWants=network-online.target\n\n[Service]\nType=simple\nUser=%s\nWorkingDirectory=%s\nEnvironmentFile=%s/.env\nExecStart=%s --enable-source-maps %s/dist/index.mjs\nRestart=always\nRestartSec=5\nStartLimitIntervalSec=0\nStandardOutput=journal\nStandardError=journal\n\n[Install]\nWantedBy=multi-user.target\n' \
+  printf '[Unit]\nDescription=Ghoghnoosself Telegram Bot\nAfter=network-online.target postgresql.service\nWants=network-online.target\n\n[Service]\nType=simple\nUser=%s\nWorkingDirectory=%s\nEnvironmentFile=%s/.env\nExecStart=%s --enable-source-maps %s/dist/index.mjs\nRestart=always\nRestartSec=5\nStandardOutput=journal\nStandardError=journal\n\n[Install]\nWantedBy=multi-user.target\n' \
     "$USER" "$INSTALL_DIR" "$INSTALL_DIR" "$NODE_BIN" "$INSTALL_DIR" \
     | sudo tee /etc/systemd/system/${SERVICE_NAME}.service > /dev/null
   sudo systemctl daemon-reload
