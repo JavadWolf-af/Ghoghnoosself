@@ -78,7 +78,11 @@ bot.setMyCommands([
 ]).catch((err) => logger.warn({ err }, "Failed to set bot commands"));
 
 let BOT_USERNAME = "";
-bot.getMe().then((me) => { BOT_USERNAME = me.username ?? ""; logger.info({ username: BOT_USERNAME }, "Bot started"); });
+// FIX: store the Promise so handlers can await it if BOT_USERNAME is still empty at startup
+const botReadyPromise: Promise<void> = bot.getMe().then((me) => {
+  BOT_USERNAME = me.username ?? "";
+  logger.info({ username: BOT_USERNAME }, "Bot started");
+});
 
 // ── یادآوری تیکت‌های بی‌پاسخ ─────────────────────────────────────────────────
 async function checkUnansweredTickets(): Promise<void> {
@@ -327,6 +331,7 @@ bot.on("callback_query", async (query) => {
 
     if (nav === "wallet") { await sendWallet(chatId, userId); return; }
     if (nav === "referral") {
+      if (!BOT_USERNAME) await botReadyPromise; // FIX: ensure username is loaded
       const user = await getUser(userId);
       if (!user) { await sendMainMenu(chatId, firstName); return; }
       await sendPanel(chatId, REFERRAL_MESSAGE(user, BOT_USERNAME), { parse_mode: "Markdown", reply_markup: cancelKeyboard() });
@@ -730,7 +735,7 @@ bot.on("message", async (msg) => {
       if (!data) { await sendPanel(chatId, "❌ لطفاً ابتدا مبلغ را وارد کنید.", { parse_mode: "Markdown", reply_markup: cancelKeyboard() }); return; }
       clearAllPending(userId);
       const fileId   = msg.photo[msg.photo.length - 1]!.file_id;
-      const requestId = await createBalanceRequest(userId, data.amount);
+      const requestId = await createBalanceRequest(userId, data.amount, fileId); // FIX: store receipt fileId
       const user     = await getUser(userId);
       await notifyAdminsDeposit(requestId, data.amount, userId, user?.firstName ?? firstName, user?.username, fileId);
       await sendPanel(chatId, BALANCE_REQUEST_SENT(), { parse_mode: "Markdown", reply_markup: userMainKeyboard() });
@@ -771,9 +776,15 @@ bot.on("message", async (msg) => {
         await sendPanel(chatId, "❌ مبلغ نامعتبر است. یک عدد صحیح وارد کنید.", { parse_mode: "Markdown", reply_markup: cancelKeyboard() });
         return;
       }
+      // FIX: verify card info is configured before showing payment details
+      const [cardNum, cardHol, cardBnk] = await Promise.all([getCardNumber(), getCardHolder(), getCardBank()]);
+      if (!cardNum || !cardHol || !cardBnk) {
+        await sendPanel(chatId, "❌ *اطلاعات کارت بانکی هنوز تنظیم نشده*\n\nلطفاً با پشتیبانی تماس بگیرید.", { parse_mode: "Markdown", reply_markup: cancelKeyboard() });
+        return;
+      }
       const receiptId = Math.random().toString(36).slice(2, 10).toUpperCase();
       setAddBalanceData(userId, amount, receiptId);
-      await sendPanel(chatId, ADD_BALANCE_RECEIPT(receiptId, amount, await getCardNumber(), await getCardHolder(), await getCardBank()), { parse_mode: "Markdown", reply_markup: cancelKeyboard() });
+      await sendPanel(chatId, ADD_BALANCE_RECEIPT(receiptId, amount, cardNum, cardHol, cardBnk), { parse_mode: "Markdown", reply_markup: cancelKeyboard() });
       return;
     }
     if (isPending(userId, "transferInput")) {
