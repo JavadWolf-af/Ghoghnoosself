@@ -60,6 +60,29 @@ NODE_VER=$(node -e "process.stdout.write(process.versions.node.split('.')[0])")
 [[ "$NODE_VER" -lt "$NODE_MIN_VERSION" ]] && error "Node.js >= $NODE_MIN_VERSION required. Current: $NODE_VER"
 success "Node.js: $(node --version)"
 
+# ── وابستگی‌های سیستمی Puppeteer (Chromium) ──────────────────────────────────
+info "نصب وابستگی‌های سیستمی Puppeteer (Chrome headless)..."
+if command -v apt-get &>/dev/null; then
+  sudo apt-get update -qq >/dev/null 2>&1 || true
+  sudo apt-get install -y \
+    ca-certificates fonts-liberation libasound2 libatk-bridge2.0-0 libatk1.0-0 \
+    libcairo2 libcups2 libdbus-1-3 libexpat1 libfontconfig1 libgbm1 \
+    libglib2.0-0 libgtk-3-0 libnspr4 libnss3 libpango-1.0-0 libpangocairo-1.0-0 \
+    libx11-6 libx11-xcb1 libxcb1 libxcomposite1 libxcursor1 libxdamage1 \
+    libxext6 libxfixes3 libxi6 libxrandr2 libxrender1 libxss1 libxtst6 \
+    lsb-release wget xdg-utils >/dev/null 2>&1
+  success "وابستگی‌های Puppeteer نصب شدند."
+elif command -v yum &>/dev/null || command -v dnf &>/dev/null; then
+  PKG_MGR="yum"; command -v dnf &>/dev/null && PKG_MGR="dnf"
+  sudo $PKG_MGR install -y \
+    alsa-lib atk cups-libs dbus-libs expat fontconfig libgbm gtk3 \
+    libX11 libXcomposite libXcursor libXdamage libXext libXfixes libXi \
+    libXrandr libXrender libXtst nss pango xdg-utils >/dev/null 2>&1
+  success "وابستگی‌های Puppeteer نصب شدند."
+else
+  warn "نصب خودکار وابستگی‌های Puppeteer پشتیبانی نمی‌شود. در صورت خطا، دستی نصب کنید."
+fi
+
 # ── PostgreSQL ────────────────────────────────────────────────────────────────
 info "بررسی PostgreSQL..."
 if ! command -v psql &>/dev/null; then
@@ -106,7 +129,6 @@ if [[ ! -f "$INSTALL_DIR/.env" ]]; then
 
   DB_PASS=$(openssl rand -base64 16 | tr -d '/+=\n' | head -c 20)
 
-  # ساخت کاربر و دیتابیس
   sudo -u postgres psql -c "CREATE USER $DB_USER WITH PASSWORD '$DB_PASS';" 2>/dev/null || \
     sudo -u postgres psql -c "ALTER USER $DB_USER WITH PASSWORD '$DB_PASS';"
   sudo -u postgres psql -c "CREATE DATABASE $DB_NAME OWNER $DB_USER;" 2>/dev/null || true
@@ -137,7 +159,6 @@ if [[ ! -f "$INSTALL_DIR/.env" ]]; then
   success "فایل .env پر شد."
 else
   success "فایل .env از قبل موجود است."
-  # اگر DATABASE_URL در .env نباشد، آن را اضافه کن
   if ! grep -q "DATABASE_URL" "$INSTALL_DIR/.env"; then
     warn "DATABASE_URL در .env یافت نشد. لطفاً آن را اضافه کنید:"
     read -rp "  DATABASE_URL (مثلاً postgresql://user:pass@localhost:5432/db): " DB_URL_INPUT
@@ -160,13 +181,18 @@ info "نصب وابستگی‌ها..."
 NODE_ENV=development npm install --include=dev --legacy-peer-deps
 success "وابستگی‌ها نصب شدند."
 
+# ── دانلود Chromium برای Puppeteer ───────────────────────────────────────────
+info "دانلود Chromium برای Puppeteer (یک‌بار)..."
+node -e "const p=require('puppeteer'); p.executablePath && console.log('Chromium:', p.executablePath())" 2>/dev/null || \
+  npx puppeteer browsers install chrome 2>/dev/null || \
+  warn "دانلود Chromium ناموفق — Puppeteer هنگام اجرا دانلود خواهد کرد."
+
 # ── بیلد ─────────────────────────────────────────────────────────────────────
 info "بیلد ربات..."
 set -a; source "$INSTALL_DIR/.env"; set +a
 NODE_ENV=development npm run build
 success "بیلد موفق."
 
-# ── جداول پایگاه داده (به‌صورت خودکار هنگام اولین راه‌اندازی ساخته می‌شوند) ─
 success "جداول دیتابیس هنگام اولین اجرا به‌صورت خودکار ساخته می‌شوند."
 
 NODE_BIN="$(command -v node)"
@@ -213,9 +239,9 @@ echo -e "  🔧 تنظیمات: ${CYAN}$INSTALL_DIR/.env${NC}"
 echo ""
 echo -e "  📌 دستورات:"
 echo -e "     ${YELLOW}update-ghoghnoosself${NC}    — آپدیت"
-echo -e "     ${YELLOW}uninstall-ghoghnoosself${NC} — حذف کامل
-     ${YELLOW}backup-ghoghnoosself${NC}    — بکاپ از دیتابیس
-     ${YELLOW}import-ghoghnoosself <file>${NC} — ایمپورت دیتابیس"
+echo -e "     ${YELLOW}uninstall-ghoghnoosself${NC} — حذف کامل"
+echo -e "     ${YELLOW}backup-ghoghnoosself${NC}    — بکاپ از دیتابیس"
+echo -e "     ${YELLOW}import-ghoghnoosself <file>${NC} — ایمپورت دیتابیس"
 echo ""
 echo -e "  🗄️  دیتابیس:"
 echo -e "     ${YELLOW}journalctl -u ghoghnoosself -f${NC}  — لاگ‌های ربات"
