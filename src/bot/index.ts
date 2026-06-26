@@ -30,6 +30,7 @@ import {
   ADMIN_DEPOSIT_APPROVED, ADMIN_DEPOSIT_REJECTED,
   ADMIN_USER_BLOCKED, ADMIN_USER_UNBLOCKED,
   ADMIN_TRANSFER_PROMPT, ADMIN_TRANSFER_SUCCESS,
+  ADMIN_TICKET_REMINDER,
 } from "./messages";
 import {
   addUser, getUser, getAllUsers, getBlockedUsers, getUserCount,
@@ -45,13 +46,17 @@ import {
   setAdminBalanceTarget, getAdminBalanceTarget,
   setAdminMessageTarget, getAdminMessageTarget,
   setAdminTicketTarget, getAdminTicketTarget,
+  getTicketsNeedingReminder, markTicketReminded,
 } from "./store";
 
-const BOT_TOKEN        = process.env["TELEGRAM_BOT_TOKEN"];
-const CHANNEL_USERNAME = process.env["CHANNEL_USERNAME"] || "@Ghoghnoosself";
-const CHANNEL_URL      = process.env["CHANNEL_URL"] || "https://t.me/Ghoghnoosself";
-const ADMIN_IDS        = (process.env["ADMIN_IDS"] || "")
+const BOT_TOKEN           = process.env["TELEGRAM_BOT_TOKEN"];
+const CHANNEL_USERNAME    = process.env["CHANNEL_USERNAME"] || "@Ghoghnoosself";
+const CHANNEL_URL         = process.env["CHANNEL_URL"] || "https://t.me/Ghoghnoosself";
+const ADMIN_IDS           = (process.env["ADMIN_IDS"] || "")
   .split(",").filter(Boolean).map((id) => parseInt(id.trim(), 10));
+const REMINDER_HOURS      = parseInt(process.env["TICKET_REMINDER_HOURS"] ?? "2", 10);
+const REMINDER_THRESHOLD  = REMINDER_HOURS * 60 * 60 * 1000; // ms
+const CHECK_INTERVAL_MS   = 30 * 60 * 1000; // هر ۳۰ دقیقه یک‌بار چک می‌کند
 
 if (!BOT_TOKEN) throw new Error("TELEGRAM_BOT_TOKEN is required");
 
@@ -70,6 +75,41 @@ bot.setMyCommands([
 
 let BOT_USERNAME = "";
 bot.getMe().then((me) => { BOT_USERNAME = me.username ?? ""; logger.info({ username: BOT_USERNAME }, "Bot started"); });
+
+// ── یادآوری تیکت‌های بی‌پاسخ ─────────────────────────────────────────────────
+async function checkUnansweredTickets(): Promise<void> {
+  const tickets = getTicketsNeedingReminder(REMINDER_THRESHOLD);
+  if (tickets.length === 0) return;
+  logger.info({ count: tickets.length }, "Sending ticket reminders");
+  for (const ticket of tickets) {
+    const user     = getUser(ticket.userId);
+    const lastMsg  = ticket.messages[ticket.messages.length - 1]!;
+    const msgText  = ADMIN_TICKET_REMINDER(
+      ticket.id, ticket.userId,
+      user?.firstName ?? String(ticket.userId),
+      user?.username,
+      lastMsg.text,
+      REMINDER_HOURS,
+    );
+    for (const adminId of ADMIN_IDS) {
+      await safeSend(
+        () => bot.sendMessage(adminId, msgText, { parse_mode: "Markdown", reply_markup: ticketKeyboard(ticket.id) }),
+        `reminder:${adminId}:${ticket.id}`
+      );
+    }
+    markTicketReminded(ticket.id);
+    // استراحت کوتاه بین تیکت‌ها تا از flood محافظت شود
+    await new Promise((r) => setTimeout(r, 100));
+  }
+}
+
+// اولین چک بعد از ۵ دقیقه (پس از راه‌اندازی)، سپس هر CHECK_INTERVAL_MS
+setTimeout(() => {
+  checkUnansweredTickets().catch((err) => logger.error({ err }, "Reminder check error"));
+  setInterval(() => {
+    checkUnansweredTickets().catch((err) => logger.error({ err }, "Reminder check error"));
+  }, CHECK_INTERVAL_MS);
+}, 5 * 60 * 1000);
 
 // ── ردیابی آخرین پیام پنل برای حذف پیش از نمایش پنل جدید ──────────────────
 const lastPanelMsg = new Map<number, number>(); // chatId → msgId
