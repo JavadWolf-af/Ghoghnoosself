@@ -44,13 +44,11 @@ export const userMainKeyboard = (): ReplyKeyboardMarkup => ({
     [{ text: USER_BUTTONS.TOKEN }],
   ],
   resize_keyboard: true,
-  is_persistent: true,
 });
 
 export const blockedKeyboard = (): ReplyKeyboardMarkup => ({
   keyboard: [[{ text: USER_BUTTONS.SUPPORT }]],
   resize_keyboard: true,
-  is_persistent: true,
 });
 
 export const walletKeyboard = (): ReplyKeyboardMarkup => ({
@@ -59,25 +57,21 @@ export const walletKeyboard = (): ReplyKeyboardMarkup => ({
     [{ text: WALLET_BUTTONS.BACK }],
   ],
   resize_keyboard: true,
-  is_persistent: true,
 });
 
 export const referralKeyboard = (): ReplyKeyboardMarkup => ({
   keyboard: [[{ text: BACK_BUTTON }]],
   resize_keyboard: true,
-  is_persistent: true,
 });
 
 export const profileKeyboard = (): ReplyKeyboardMarkup => ({
   keyboard: [[{ text: BACK_BUTTON }]],
   resize_keyboard: true,
-  is_persistent: true,
 });
 
 export const backKeyboard = (): ReplyKeyboardMarkup => ({
   keyboard: [[{ text: BACK_BUTTON }]],
   resize_keyboard: true,
-  is_persistent: true,
 });
 
 export const adminMainKeyboard = (): ReplyKeyboardMarkup => ({
@@ -86,7 +80,6 @@ export const adminMainKeyboard = (): ReplyKeyboardMarkup => ({
     [{ text: ADMIN_BUTTONS.EXIT_ADMIN }],
   ],
   resize_keyboard: true,
-  is_persistent: true,
 });
 
 export const adminManageKeyboard = (): ReplyKeyboardMarkup => ({
@@ -98,7 +91,6 @@ export const adminManageKeyboard = (): ReplyKeyboardMarkup => ({
     [{ text: MANAGE_BUTTONS.BACK }],
   ],
   resize_keyboard: true,
-  is_persistent: true,
 });
 
 // ── Inline Keyboards ──────────────────────────────────────────────────────────
