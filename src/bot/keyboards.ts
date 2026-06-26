@@ -3,8 +3,6 @@ import type {
   ReplyKeyboardMarkup,
 } from "node-telegram-bot-api";
 
-// ── Inline Navigation Keyboards ───────────────────────────────────────────────
-
 export const userMainKeyboard = (): InlineKeyboardMarkup => ({
   inline_keyboard: [
     [{ text: "💎 کیف پول", callback_data: "nav:wallet" },       { text: "🔗 دعوت از دوستان", callback_data: "nav:referral" }],
@@ -33,29 +31,44 @@ export const adminManageKeyboard = (): InlineKeyboardMarkup => ({
     [{ text: "💰 افزودن موجودی", callback_data: "nav:admin_add_balance" },  { text: "↔️ انتقال اعتبار", callback_data: "nav:admin_transfer" }],
     [{ text: "🎫 تیکت‌های باز",  callback_data: "nav:admin_open_tickets" }, { text: "🚫 لیست مسدودها",   callback_data: "nav:admin_blocked_list" }],
     [{ text: "🔍 جستجوی کاربر",  callback_data: "nav:admin_search_user" },  { text: "💬 پیام به کاربر",  callback_data: "nav:admin_message_user" }],
+    [{ text: "🔑 هزینه توکن",    callback_data: "nav:admin_token_cost" },   { text: "⏳ توکن‌های گریس",  callback_data: "nav:admin_grace_tokens" }],
     [{ text: "🔙 بازگشت",         callback_data: "nav:back" }],
   ],
 });
 
-// دکمه لغو / بازگشت برای صفحه‌های ورود متن
 export const cancelKeyboard = (): InlineKeyboardMarkup => ({
   inline_keyboard: [[{ text: "🔙 لغو / بازگشت", callback_data: "nav:back" }]],
 });
 
-// ── Reply Keyboard (فقط کاربران مسدودشده) ────────────────────────────────────
 export const blockedKeyboard = (): ReplyKeyboardMarkup => ({
   keyboard: [[{ text: "🎧 پشتیبانی" }]],
   resize_keyboard: true,
   is_persistent: true,
 });
 
-// ── Inline Keyboards (عملیات ادمین) ──────────────────────────────────────────
-
 export const depositReviewKeyboard = (requestId: string, userId: number): InlineKeyboardMarkup => ({
   inline_keyboard: [
     [
       { text: "✅ تأیید واریز",   callback_data: `deposit:approve:${requestId}` },
       { text: "❌ رد درخواست",   callback_data: `deposit:reject:${requestId}` },
+    ],
+    [
+      { text: "💬 پیام به کاربر", callback_data: `user:msg:${userId}` },
+      { text: "⛔️ مسدود کردن",  callback_data: `user:block:${userId}` },
+    ],
+  ],
+});
+
+export const depositReviewWithRestoreKeyboard = (
+  requestId: string, userId: number, tokenCode: string,
+): InlineKeyboardMarkup => ({
+  inline_keyboard: [
+    [
+      { text: "✅ تأیید واریز",   callback_data: `deposit:approve:${requestId}` },
+      { text: "❌ رد درخواست",   callback_data: `deposit:reject:${requestId}` },
+    ],
+    [
+      { text: "🔄 تأیید + بازگردانی توکن", callback_data: `deposit:approve_restore:${requestId}:${tokenCode}` },
     ],
     [
       { text: "💬 پیام به کاربر", callback_data: `user:msg:${userId}` },
@@ -99,10 +112,24 @@ export const broadcastConfirmKeyboard = (): InlineKeyboardMarkup => ({
 
 export const channelCheckKeyboard = (
   channelUrl: string,
-  botUsername: string
+  botUsername: string,
 ): InlineKeyboardMarkup => ({
   inline_keyboard: [
     [{ text: "📢 عضویت در کانال", url: channelUrl }],
     [{ text: "✅ عضو شدم — بررسی کن", url: `https://t.me/${botUsername}?start=checked` }],
   ],
+});
+
+export const tokenCostKeyboard = (): InlineKeyboardMarkup => ({
+  inline_keyboard: [
+    [{ text: "✏️ تنظیم هزینه روزانه", callback_data: "nav:admin_set_token_cost" }],
+    [{ text: "⏳ مشاهده توکن‌های گریس",  callback_data: "nav:admin_grace_tokens" }],
+    [{ text: "🔙 بازگشت",                callback_data: "nav:back" }],
+  ],
+});
+
+export const graceTokenRestoreKeyboard = (tokenCode: string, userId: number): InlineKeyboardMarkup => ({
+  inline_keyboard: [[
+    { text: "🔄 بازگردانی توکن", callback_data: `token:restore:${tokenCode}:${userId}` },
+  ]],
 });
