@@ -7,15 +7,15 @@ DB_NAME="ghoghnoosself"
 DB_USER="ghoghnoosself"
 
 RED="[0;31m"; GREEN="[0;32m"; YELLOW="[1;33m"; CYAN="[0;36m"; NC="[0m"
-info()    {{ echo -e "${{CYAN}}[INFO]${{NC}}  $*"; }}
-success() {{ echo -e "${{GREEN}}[OK]${{NC}}    $*"; }}
-warn()    {{ echo -e "${{YELLOW}}[WARN]${{NC}}  $*"; }}
-error()   {{ echo -e "${{RED}}[ERROR]${{NC}} $*"; exit 1; }}
+info()    { echo -e "${CYAN}[INFO]${NC}  $*"; }
+success() { echo -e "${GREEN}[OK]${NC}    $*"; }
+warn()    { echo -e "${YELLOW}[WARN]${NC}  $*"; }
+error()   { echo -e "${RED}[ERROR]${NC} $*"; exit 1; }
 
 echo ""
-echo -e "${{CYAN}}══════════════════════════════════════════${{NC}}"
-echo -e "${{CYAN}}   ربات سلف — آپدیت                      ${{NC}}"
-echo -e "${{CYAN}}══════════════════════════════════════════${{NC}}"
+echo -e "${CYAN}══════════════════════════════════════════${NC}"
+echo -e "${CYAN}   ربات سلف — آپدیت                      ${NC}"
+echo -e "${CYAN}══════════════════════════════════════════${NC}"
 echo ""
 
 [[ ! -d "$INSTALL_DIR" ]] && error "ربات نصب نشده. ابتدا install.sh را اجرا کنید."
@@ -90,8 +90,8 @@ if [[ -f "$INSTALL_DIR/.env" ]] && ! grep -q "DATABASE_URL" "$INSTALL_DIR/.env";
     sudo -u postgres psql -c "ALTER USER $DB_USER WITH PASSWORD ''$DB_PASS''" 2>/dev/null || true
   sudo -u postgres psql -c "CREATE DATABASE $DB_NAME OWNER $DB_USER;" 2>/dev/null || true
   sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE $DB_NAME TO $DB_USER;" 2>/dev/null || true
-  DATABASE_URL="postgresql://${{DB_USER}}:${{DB_PASS}}@localhost:5432/${{DB_NAME}}"
-  echo "DATABASE_URL=${{DATABASE_URL}}" >> "$INSTALL_DIR/.env"
+  DATABASE_URL="postgresql://${DB_USER}:${DB_PASS}@localhost:5432/${DB_NAME}"
+  echo "DATABASE_URL=${DATABASE_URL}" >> "$INSTALL_DIR/.env"
   success "دیتابیس ساخته شد و DATABASE_URL به .env اضافه شد."
 fi
 
@@ -122,5 +122,6 @@ else
 fi
 
 echo ""
-echo -e "${{GREEN}}✅ آپدیت با موفقیت انجام شد! (v2 — PostgreSQL)${{NC}}"
+echo -e "${GREEN}✅ آپدیت با موفقیت انجام شد! (v2 — PostgreSQL)${NC}"
 echo ""
+
