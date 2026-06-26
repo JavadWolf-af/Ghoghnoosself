@@ -10,14 +10,35 @@ export const MAIN_MENU_MESSAGE = (firstName: string): string =>
 export const NOT_MEMBER_MESSAGE = (): string =>
   `⚠️ هنوز عضو کانال نشده‌اید.\nلطفاً ابتدا عضو شوید سپس دکمه «✅ عضو شدم» را بزنید.`;
 
+export const MEMBERSHIP_CHECK_FAILED_MESSAGE = (): string =>
+  `⚠️ *خطا در بررسی عضویت*\n\n` +
+  `در حال حاضر امکان بررسی عضویت وجود ندارد.\n` +
+  `لطفاً چند دقیقه صبر کنید و دوباره تلاش کنید.`;
+
 export const ADMIN_PANEL_MESSAGE = (): string =>
   `🔐 *پنل مدیریت*\n\nخوش آمدید به پنل ادمین.\nبرای دسترسی به امکانات، وارد مدیریت منو شوید:`;
 
 export const ADMIN_MANAGE_MESSAGE = (): string =>
   `📋 *مدیریت منو*\n\nیک گزینه را انتخاب کنید:`;
 
-export const SUPPORT_MESSAGE = (): string =>
-  `📞 *پشتیبانی*\n\nپیام خود را ارسال کنید.\nکارشناسان در اسرع وقت پاسخ می‌دهند. 🙏`;
+export const SUPPORT_PROMPT = (): string =>
+  `📞 *پشتیبانی*\n\nپیام خود را بنویسید تا برای پشتیبانی ارسال شود.\n\nبرای انصراف 🔙 را بزنید.`;
+
+export const SUPPORT_SENT = (): string =>
+  `✅ *پیام شما ارسال شد*\n\nپیامتان به پشتیبانی رسید. در اسرع وقت پاسخ می‌گیرید. 🙏`;
+
+export const ADMIN_SUPPORT_MESSAGE = (
+  userId: number, firstName: string, username: string | undefined, text: string
+): string =>
+  `📞 *پیام پشتیبانی*\n\n` +
+  `👤 کاربر: *${firstName}*${username ? ` (@${username})` : ""}\n` +
+  `🔢 آیدی: \`${userId}\`\n\n` +
+  `💬 پیام:\n${text}`;
+
+export const BLOCKED_SUPPORT_PROMPT = (): string =>
+  `📞 *پشتیبانی*\n\n` +
+  `حساب شما مسدود شده است.\n` +
+  `پیام خود را بنویسید تا به پشتیبانی ارسال شود:`;
 
 export const BLOCKED_SUPPORT_SENT = (): string =>
   `📨 *پیام شما ارسال شد*\n\nپیام شما به پشتیبانی ارسال شد.\nمنتظر پاسخ باشید. 🙏`;
@@ -27,9 +48,11 @@ export const BLOCKED_ONLY_SUPPORT = (): string =>
 
 export const TOKEN_SECTION_MESSAGE = (): string =>
   `⭐ *افزودن توکن*\n\n` +
-  `این بخش برای فعال‌سازی امکانات حرفه‌ای طراحی شده است.\n\n` +
-  `🔜 *به زودی:*\n• دسترسی به سرویس‌های پیشرفته\n• امکانات ویژه اعضای توکن‌دار\n\n` +
+  `این بخش برای فعال‌سازی امکانات ویژه طراحی شده است.\n\n` +
   `در صورت داشتن توکن، آن را وارد کنید:`;
+
+export const TOKEN_ALREADY_ACTIVATED_MESSAGE = (): string =>
+  `✅ *حساب شما فعال است*\n\nشما قبلاً توکن خود را فعال کرده‌اید و به تمام امکانات دسترسی دارید.`;
 
 export const TOKEN_SUCCESS_MESSAGE = (firstName: string): string =>
   `🎉 *تبریک ${firstName} عزیز!*\n\nتوکن شما با موفقیت فعال شد. به امکانات ویژه دسترسی دارید. 🚀`;
@@ -47,7 +70,7 @@ export const WALLET_MESSAGE = (balance: number): string =>
   `💰 *کیف پول*\n\nموجودی: *${balance.toLocaleString("fa-IR")} تومان*\n\nیک گزینه را انتخاب کنید:`;
 
 export const ADD_BALANCE_AMOUNT_PROMPT = (): string =>
-  `➕ *افزایش موجودی*\n\nمقدار واریز را *بر حسب تومان* وارد کنید:\n_(مثال: 50000)_\n\nبرای انصراف 🔙 را بزنید.`;
+  `➕ *افزایش موجودی*\n\nمقدار واریز را *بر حسب تومان* وارد کنید:\n\nبرای انصراف 🔙 را بزنید.`;
 
 export const ADD_BALANCE_RECEIPT = (receiptId: string, amount: number, cardNumber: string): string =>
   `🧾 *رسید واریز*\n\n` +
@@ -77,7 +100,7 @@ export const UNBLOCKED_MESSAGE = (): string =>
   `✅ *حساب شما آزاد شد*\n\nمحدودیت حساب شما برداشته شده است.\nمی‌توانید مجدداً از تمام خدمات استفاده کنید.`;
 
 export const TRANSFER_PROMPT = (): string =>
-  `💸 *انتقال اعتبار*\n\nشناسه کاربر مقصد و مبلغ را وارد کنید:\n\`[شناسه کاربر] [مبلغ]\`\n\nمثال: \`123456789 5000\`\n\nبرای انصراف 🔙 را بزنید.`;
+  `💸 *انتقال اعتبار*\n\nشناسه کاربر مقصد و مبلغ را وارد کنید:\n\`[شناسه کاربر] [مبلغ]\`\n\nبرای انصراف 🔙 را بزنید.`;
 
 export const TRANSFER_SUCCESS = (toUserId: number, amount: number): string =>
   `✅ *انتقال موفق*\n\n*${amount.toLocaleString("fa-IR")} تومان* به کاربر \`${toUserId}\` منتقل شد.`;
@@ -85,7 +108,7 @@ export const TRANSFER_SUCCESS = (toUserId: number, amount: number): string =>
 export const TRANSFER_FAILED = (reason: string): string => ({
   insufficient_balance: "❌ موجودی کافی ندارید.",
   target_not_found:     "❌ کاربر مقصد یافت نشد.",
-  invalid_format:       "❌ فرمت نادرست.\nمثال: `123456789 5000`",
+  invalid_format:       "❌ فرمت نادرست.\nشناسه کاربر و مبلغ را جداگانه وارد کنید.",
   invalid_amount:       "❌ مبلغ باید عدد مثبت باشد.",
 }[reason] ?? "❌ خطا در انتقال. دوباره امتحان کنید.");
 
@@ -113,7 +136,7 @@ export const BROADCAST_SENT = (count: number): string =>
   `✅ پیام برای *${count}* کاربر ارسال شد.`;
 
 export const CARD_NUMBER_PROMPT = (): string =>
-  `💳 *تنظیم شماره کارت*\n\nشماره کارت جدید را وارد کنید:\n_(مثال: 6037-9975-1234-5678)_\n\nبرای انصراف 🔙 را بزنید.`;
+  `💳 *تنظیم شماره کارت*\n\nشماره کارت جدید را وارد کنید:\n\nبرای انصراف 🔙 را بزنید.`;
 
 export const CARD_NUMBER_SET = (card: string): string =>
   `✅ شماره کارت ذخیره شد:\n\`${card}\``;
@@ -179,7 +202,7 @@ export const ADMIN_USER_UNBLOCKED = (firstName: string, userId: number): string 
   `✅ کاربر *${firstName}* (\`${userId}\`) آزاد شد.`;
 
 export const ADMIN_TRANSFER_PROMPT = (): string =>
-  `💸 *انتقال اعتبار کاربر*\n\nفرمت: \`[شناسه مبدا] [شناسه مقصد] [مبلغ]\`\n\nمثال: \`111 222 5000\`\n\nبرای انصراف 🔙 را بزنید.`;
+  `💸 *انتقال اعتبار کاربر*\n\nفرمت: \`[شناسه مبدا] [شناسه مقصد] [مبلغ]\`\n\nبرای انصراف 🔙 را بزنید.`;
 
 export const ADMIN_TRANSFER_SUCCESS = (from: number, to: number, amount: number): string =>
   `✅ *انتقال موفق*\n\n${amount.toLocaleString("fa-IR")} تومان از \`${from}\` به \`${to}\` منتقل شد.`;
