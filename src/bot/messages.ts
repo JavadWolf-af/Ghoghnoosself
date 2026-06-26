@@ -379,6 +379,41 @@ export const ADMIN_TRANSFER_SUCCESS = (from: number, to: number, amount: number)
   `✅ *انتقال موفق*\n\n` +
   `*${amount.toLocaleString("fa-IR")} تومان* از \`${from}\` به \`${to}\` منتقل شد.`;
 
+// ── Admin Search User ─────────────────────────────────────────────────────────
+
+export const ADMIN_SEARCH_USER_PROMPT = (): string =>
+  `🔍 *جستجوی کاربر*\n\n` +
+  `━━━━━━━━━━━━━━━━━\n` +
+  `آیدی عددی یا یوزرنیم کاربر را وارد کنید:\n\n` +
+  `مثال: \`123456789\` یا \`@username\`\n\n` +
+  `↩️ برای انصراف 🔙 را بزنید`;
+
+export const ADMIN_SEARCH_USER_NOT_FOUND = (): string =>
+  `❌ *کاربر یافت نشد*\n\nکاربری با این آیدی یا یوزرنیم ثبت‌نام نکرده است.`;
+
+export const ADMIN_USER_PROFILE_ADMIN = (user: {
+  id: number;
+  firstName: string;
+  lastName?: string;
+  username?: string;
+  joinedAt: Date;
+  isActivated: boolean;
+  isBlocked: boolean;
+  balance: number;
+  referralCount: number;
+}): string =>
+  `👤 *پروفایل کاربر*\n\n` +
+  `━━━━━━━━━━━━━━━━━\n` +
+  `🆔 آیدی: \`${user.id}\`\n` +
+  `📛 نام: *${esc(user.firstName)}${user.lastName ? " " + esc(user.lastName) : ""}*\n` +
+  (user.username ? `🔖 یوزرنیم: @${esc(user.username)}\n` : "") +
+  `📅 عضویت: ${user.joinedAt.toLocaleDateString("fa-IR")}\n` +
+  `━━━━━━━━━━━━━━━━━\n` +
+  `💎 موجودی: *${user.balance.toLocaleString("fa-IR")} تومان*\n` +
+  `👥 زیرمجموعه: *${user.referralCount}* نفر\n` +
+  `🔑 وضعیت: ${user.isActivated ? "✅ فعال" : "⏳ غیرفعال"}\n` +
+  `🔒 مسدود: ${user.isBlocked ? "⛔️ بله" : "✅ خیر"}`;
+
 // ── Open Tickets View ─────────────────────────────────────────────────────────
 
 export const USER_NO_OPEN_TICKET = (): string =>

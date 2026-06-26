@@ -4,7 +4,7 @@ import {
   userMainKeyboard, walletKeyboard, referralKeyboard, profileKeyboard,
   backKeyboard, adminMainKeyboard, adminManageKeyboard,
   channelCheckKeyboard, blockedKeyboard, depositReviewKeyboard, unblockKeyboard,
-  ticketKeyboard,
+  ticketKeyboard, adminUserActionKeyboard,
   USER_BUTTONS, WALLET_BUTTONS, ADMIN_BUTTONS, MANAGE_BUTTONS, BACK_BUTTON,
 } from "./keyboards";
 import {
@@ -33,6 +33,7 @@ import {
   ADMIN_TICKET_REMINDER,
   USER_NO_OPEN_TICKET, USER_OPEN_TICKET,
   ADMIN_OPEN_TICKETS_HEADER, ADMIN_OPEN_TICKET_ITEM,
+  ADMIN_SEARCH_USER_PROMPT, ADMIN_SEARCH_USER_NOT_FOUND, ADMIN_USER_PROFILE_ADMIN,
 } from "./messages";
 import {
   addUser, getUser, getAllUsers, getBlockedUsers, getUserCount,
@@ -41,7 +42,7 @@ import {
   getUserBalance, addBalance, transferBalance,
   createBalanceRequest, getBalanceRequest, approveBalanceRequest, rejectBalanceRequest,
   setCardNumber, getCardNumber,
-  createSupportTicket, getOpenTicketByUser, getSupportTicket, getAllOpenTickets,
+  createSupportTicket, getOpenTicketByUser, getSupportTicket, getAllOpenTickets, findUserByUsername,
   addTicketMessage, closeSupportTicket, getOpenTicketsCount,
   setPending, clearAllPending, isPending, isPendingAdminManage, isPendingWallet,
   setAddBalanceData, getAddBalanceData,
@@ -377,6 +378,16 @@ bot.on("callback_query", async (query) => {
     return;
   }
 
+  if (data.startsWith("usr_addbal:")) {
+    const targetUserId = parseInt(data.replace("usr_addbal:", ""), 10);
+    const targetUser   = getUser(targetUserId);
+    if (!targetUser) { await sendTracked(chatId, ADMIN_USER_NOT_FOUND(), { parse_mode: "Markdown" }); return; }
+    setPending(adminId, "adminAddBalance");
+    setAdminBalanceTarget(adminId, targetUserId);
+    await sendPanel(chatId, ADMIN_ADD_BALANCE_AMOUNT_PROMPT(targetUser.firstName), { parse_mode: "Markdown", reply_markup: backKeyboard() });
+    return;
+  }
+
   if (data.startsWith("dep_msg:")) {
     const targetUserId = parseInt(data.replace("dep_msg:", ""), 10);
     setPending(adminId, "adminMessageUser");
@@ -518,6 +529,25 @@ bot.on("message", async (msg) => {
         return;
       }
 
+      if (isPending(userId, "adminSearchUser")) {
+        clearAllPending(userId);
+        const query = text.trim();
+        let found = isNaN(Number(query))
+          ? findUserByUsername(query)
+          : getUser(parseInt(query, 10));
+        await sendAdminManage(chatId);
+        if (!found) {
+          await sendTracked(chatId, ADMIN_SEARCH_USER_NOT_FOUND(), { parse_mode: "Markdown" });
+        } else {
+          await sendTracked(
+            chatId,
+            ADMIN_USER_PROFILE_ADMIN(found),
+            { parse_mode: "Markdown", reply_markup: adminUserActionKeyboard(found.id, found.isBlocked) }
+          );
+        }
+        return;
+      }
+
       if (isPending(userId, "adminAddBalance")) {
         const targetId = parseInt(text.trim(), 10);
         if (isNaN(targetId)) {
@@ -636,6 +666,11 @@ bot.on("message", async (msg) => {
             { parse_mode: "Markdown", reply_markup: unblockKeyboard(u.id) }
           );
         }
+        return;
+      }
+      if (text === MANAGE_BUTTONS.SEARCH_USER) {
+        setPending(userId, "adminSearchUser");
+        await sendPanel(chatId, ADMIN_SEARCH_USER_PROMPT(), { parse_mode: "Markdown", reply_markup: backKeyboard() });
         return;
       }
       if (text === MANAGE_BUTTONS.OPEN_TICKETS) {

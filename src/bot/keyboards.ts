@@ -34,6 +34,7 @@ export const MANAGE_BUTTONS = {
   TRANSFER_USER: "↔️ انتقال اعتبار",
   OPEN_TICKETS:  "🎫 تیکت‌های باز",
   BLOCKED_LIST:  "🚫 لیست مسدودها",
+  SEARCH_USER:   "🔍 جستجوی کاربر",
   BACK:          BACK_BUTTON,
 };
 
@@ -90,6 +91,7 @@ export const adminManageKeyboard = (): ReplyKeyboardMarkup => ({
     [{ text: MANAGE_BUTTONS.ADD_TOKEN },     { text: MANAGE_BUTTONS.CARD_NUMBER }],
     [{ text: MANAGE_BUTTONS.ADD_BALANCE },   { text: MANAGE_BUTTONS.TRANSFER_USER }],
     [{ text: MANAGE_BUTTONS.OPEN_TICKETS },  { text: MANAGE_BUTTONS.BLOCKED_LIST }],
+    [{ text: MANAGE_BUTTONS.SEARCH_USER }],
     [{ text: MANAGE_BUTTONS.BACK }],
   ],
   resize_keyboard: true,
@@ -131,4 +133,18 @@ export const ticketKeyboard = (ticketId: string): InlineKeyboardMarkup => ({
     { text: "✏️ پاسخ دادن", callback_data: `tkt_reply:${ticketId}` },
     { text: "🔒 بستن تیکت", callback_data: `tkt_close:${ticketId}` },
   ]],
+});
+
+export const adminUserActionKeyboard = (userId: number, isBlocked: boolean): InlineKeyboardMarkup => ({
+  inline_keyboard: [
+    [
+      { text: "💰 افزودن موجودی",  callback_data: `usr_addbal:${userId}` },
+      { text: "💬 پیام به کاربر",  callback_data: `dep_msg:${userId}` },
+    ],
+    [
+      isBlocked
+        ? { text: "🔓 رفع مسدودیت", callback_data: `unblock:${userId}` }
+        : { text: "⛔️ مسدود کردن",  callback_data: `dep_block:${userId}` },
+    ],
+  ],
 });

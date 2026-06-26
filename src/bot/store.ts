@@ -271,6 +271,11 @@ export function getOpenTicketsCount(): number {
   return Array.from(ticketsMap.values()).filter(t => t.status === "open").length;
 }
 
+export function findUserByUsername(username: string): UserRecord | undefined {
+  const q = username.replace(/^@/, "").toLowerCase();
+  return Array.from(users.values()).find(u => u.username?.toLowerCase() === q);
+}
+
 export function getAllOpenTickets(): SupportTicket[] {
   return Array.from(ticketsMap.values())
     .filter(t => t.status === "open")
@@ -285,13 +290,14 @@ export function getCardNumber(): string { return cardNumber; }
 type PendingSet =
   | "broadcast" | "tokenEntry" | "addBalance" | "transferInput"
   | "cardNumberInput" | "adminTransfer" | "adminAddBalance" | "adminAddBalanceAmount"
-  | "adminMessageUser" | "support" | "blockedSupport" | "ticketReply";
+  | "adminMessageUser" | "support" | "blockedSupport" | "ticketReply" | "adminSearchUser";
 
 const SETS: Record<PendingSet, Set<number>> = {
   broadcast: new Set(), tokenEntry: new Set(), addBalance: new Set(),
   transferInput: new Set(), cardNumberInput: new Set(), adminTransfer: new Set(),
   adminAddBalance: new Set(), adminAddBalanceAmount: new Set(), adminMessageUser: new Set(),
   support: new Set(), blockedSupport: new Set(), ticketReply: new Set(),
+  adminSearchUser: new Set(),
 };
 
 const addBalanceData     = new Map<number, { amount: number; receiptId: string }>();
@@ -324,7 +330,8 @@ export function isPendingAdminManage(userId: number): boolean {
     || SETS["adminAddBalance"].has(userId)
     || SETS["adminAddBalanceAmount"].has(userId)
     || SETS["adminMessageUser"].has(userId)
-    || SETS["ticketReply"].has(userId);
+    || SETS["ticketReply"].has(userId)
+    || SETS["adminSearchUser"].has(userId);
 }
 
 export function setAddBalanceData(userId: number, amount: number, receiptId: string): void {
