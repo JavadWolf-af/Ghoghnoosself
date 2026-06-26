@@ -556,18 +556,18 @@ export interface BillingResult {
   notifications: BillingNotification[];
 }
 
-let _tokenDailyCost: number | null = null;
+let _tokenHourlyCost: number | null = null;
 
-export async function getTokenDailyCost(): Promise<number> {
-  if (_tokenDailyCost !== null) return _tokenDailyCost;
-  const rows = await db.select().from(settings).where(eq(settings.key, "daily_token_cost")).limit(1);
-  _tokenDailyCost = rows[0] ? parseInt(rows[0].value, 10) : 0;
-  return _tokenDailyCost;
+export async function getTokenHourlyCost(): Promise<number> {
+  if (_tokenHourlyCost !== null) return _tokenHourlyCost;
+  const rows = await db.select().from(settings).where(eq(settings.key, "hourly_token_cost")).limit(1);
+  _tokenHourlyCost = rows[0] ? parseInt(rows[0].value, 10) : 0;
+  return _tokenHourlyCost;
 }
 
-export async function setTokenDailyCost(amount: number): Promise<void> {
-  _tokenDailyCost = amount;
-  await db.insert(settings).values({ key: "daily_token_cost", value: String(amount) })
+export async function setTokenHourlyCost(amount: number): Promise<void> {
+  _tokenHourlyCost = amount;
+  await db.insert(settings).values({ key: "hourly_token_cost", value: String(amount) })
     .onConflictDoUpdate({ target: settings.key, set: { value: String(amount) } });
 }
 
@@ -624,14 +624,14 @@ export async function restoreTokenFromGrace(code: string): Promise<boolean> {
 const GRACE_DAYS = 10;
 const GRACE_MS   = GRACE_DAYS * 24 * 60 * 60 * 1000;
 
-export async function runDailyBilling(): Promise<BillingResult> {
-  const dailyCost = await getTokenDailyCost();
+export async function runHourlyBilling(): Promise<BillingResult> {
+  const hourlyCost = await getTokenHourlyCost();
   const result: BillingResult = { billed: 0, graceStarted: 0, expired: 0, notifications: [] };
-  if (dailyCost <= 0) return result;
+  if (hourlyCost <= 0) return result;
 
-  const activeTokens       = await getActiveTokensWithUsers();
-  const LOW_THRESHOLD      = dailyCost * 6;  // ~20% of a 30-day billing month
-  const CRITICAL_THRESHOLD = dailyCost * 3;  // ~10%
+  const activeTokens = await getActiveTokensWithUsers();
+  const LOW_THRESHOLD      = hourlyCost * 144;  // ~20% — 6 days remaining
+  const CRITICAL_THRESHOLD = hourlyCost * 72;   // ~10% — 3 days remaining
 
   for (const token of activeTokens) {
     if (!token.usedByUserId) continue;
@@ -652,7 +652,7 @@ export async function runDailyBilling(): Promise<BillingResult> {
 
     // status === "active": deduct daily cost
     const prevBalance = await getUserBalance(userId);
-    const deducted    = await deductBalance(userId, dailyCost);
+    const deducted    = await deductBalance(userId, hourlyCost);
 
     if (!deducted) {
       await startTokenGracePeriod(token.code);
@@ -660,12 +660,12 @@ export async function runDailyBilling(): Promise<BillingResult> {
       result.notifications.push({ userId, type: "grace_started", daysLeft: GRACE_DAYS, tokenCode: token.code });
     } else {
       result.billed++;
-      const newBalance = prevBalance - dailyCost;
+      const newBalance = prevBalance - hourlyCost;
       // Only warn on threshold crossings so user gets each warning exactly once
       if (prevBalance >= LOW_THRESHOLD && newBalance < LOW_THRESHOLD && newBalance >= CRITICAL_THRESHOLD) {
-        result.notifications.push({ userId, type: "low", daysLeft: Math.max(1, Math.floor(newBalance / dailyCost)), tokenCode: token.code });
+        result.notifications.push({ userId, type: "low", daysLeft: Math.max(1, Math.floor(newBalance / (hourlyCost * 24))), tokenCode: token.code });
       } else if (prevBalance >= CRITICAL_THRESHOLD && newBalance < CRITICAL_THRESHOLD) {
-        result.notifications.push({ userId, type: "critical", daysLeft: Math.max(1, Math.floor(newBalance / dailyCost)), tokenCode: token.code });
+        result.notifications.push({ userId, type: "critical", daysLeft: Math.max(1, Math.floor(newBalance / (hourlyCost * 24))), tokenCode: token.code });
       }
     }
   }
