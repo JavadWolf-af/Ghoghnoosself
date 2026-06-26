@@ -8,7 +8,7 @@ export const users = pgTable("users", {
   firstName:    varchar("first_name", { length: 256 }).notNull(),
   lastName:     varchar("last_name",  { length: 256 }),
   username:     varchar("username",   { length: 256 }),
-  balance:      integer("balance").notNull().default(0),
+  balance:      bigint("balance", { mode: "number" }).notNull().default(0),
   isActivated:  boolean("is_activated").notNull().default(false),
   activatedAt:  timestamp("activated_at"),
   isBlocked:    boolean("is_blocked").notNull().default(false),
@@ -28,11 +28,12 @@ export const tokens = pgTable("tokens", {
 });
 
 export const balanceRequests = pgTable("balance_requests", {
-  id:          varchar("id", { length: 32 }).primaryKey(),
-  userId:      bigint("user_id", { mode: "number" }).notNull(),
-  amount:      integer("amount").notNull(),
-  requestedAt: timestamp("requested_at").notNull().defaultNow(),
-  status:      varchar("status", { length: 16 }).notNull().default("pending"),
+  id:            varchar("id", { length: 32 }).primaryKey(),
+  userId:        bigint("user_id", { mode: "number" }).notNull(),
+  amount:        bigint("amount", { mode: "number" }).notNull(),
+  receiptFileId: varchar("receipt_file_id", { length: 256 }),
+  requestedAt:   timestamp("requested_at").notNull().defaultNow(),
+  status:        varchar("status", { length: 16 }).notNull().default("pending"),
 });
 
 export const supportTickets = pgTable("support_tickets", {
