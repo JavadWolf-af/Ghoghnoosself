@@ -290,7 +290,8 @@ export function getCardNumber(): string { return cardNumber; }
 type PendingSet =
   | "broadcast" | "tokenEntry" | "addBalance" | "transferInput"
   | "cardNumberInput" | "adminTransfer" | "adminAddBalance" | "adminAddBalanceAmount"
-  | "adminMessageUser" | "support" | "blockedSupport" | "ticketReply" | "adminSearchUser";
+  | "adminMessageUser" | "support" | "blockedSupport" | "ticketReply" | "adminSearchUser"
+  | "adminDepositReview" | "adminTicketAction" | "adminUserAction";
 
 const SETS: Record<PendingSet, Set<number>> = {
   broadcast: new Set(), tokenEntry: new Set(), addBalance: new Set(),
@@ -298,12 +299,15 @@ const SETS: Record<PendingSet, Set<number>> = {
   adminAddBalance: new Set(), adminAddBalanceAmount: new Set(), adminMessageUser: new Set(),
   support: new Set(), blockedSupport: new Set(), ticketReply: new Set(),
   adminSearchUser: new Set(),
+  adminDepositReview: new Set(), adminTicketAction: new Set(), adminUserAction: new Set(),
 };
 
-const addBalanceData     = new Map<number, { amount: number; receiptId: string }>();
-const adminBalanceTarget = new Map<number, number>();
-const adminMessageTarget = new Map<number, number>();
-const adminTicketTarget  = new Map<number, string>(); // adminId -> ticketId
+const addBalanceData      = new Map<number, { amount: number; receiptId: string }>();
+const adminBalanceTarget  = new Map<number, number>();
+const adminMessageTarget  = new Map<number, number>();
+const adminTicketTarget   = new Map<number, string>();
+const adminDepositTarget  = new Map<number, { requestId: string; userId: number }>();
+const adminUserActionTarget = new Map<number, number>();
 
 export function setPending(userId: number, state: PendingSet): void {
   clearAllPending(userId); SETS[state].add(userId);
@@ -315,6 +319,8 @@ export function clearAllPending(userId: number): void {
   adminBalanceTarget.delete(userId);
   adminMessageTarget.delete(userId);
   adminTicketTarget.delete(userId);
+  adminDepositTarget.delete(userId);
+  adminUserActionTarget.delete(userId);
 }
 
 export function isPending(userId: number, state: PendingSet): boolean { return SETS[state].has(userId); }
@@ -331,7 +337,10 @@ export function isPendingAdminManage(userId: number): boolean {
     || SETS["adminAddBalanceAmount"].has(userId)
     || SETS["adminMessageUser"].has(userId)
     || SETS["ticketReply"].has(userId)
-    || SETS["adminSearchUser"].has(userId);
+    || SETS["adminSearchUser"].has(userId)
+    || SETS["adminDepositReview"].has(userId)
+    || SETS["adminTicketAction"].has(userId)
+    || SETS["adminUserAction"].has(userId);
 }
 
 export function setAddBalanceData(userId: number, amount: number, receiptId: string): void {
@@ -353,13 +362,21 @@ export function setAdminTicketTarget(adminId: number, ticketId: string): void {
 }
 export function getAdminTicketTarget(adminId: number): string | undefined { return adminTicketTarget.get(adminId); }
 
-// ── Ticket Reminders ──────────────────────────────────────────────────────────
+export function setAdminDepositTarget(adminId: number, target: { requestId: string; userId: number }): void {
+  adminDepositTarget.set(adminId, target);
+}
+export function getAdminDepositTarget(adminId: number): { requestId: string; userId: number } | undefined {
+  return adminDepositTarget.get(adminId);
+}
 
-/**
- * بازگرداندن تیکت‌هایی که آخرین پیام از کاربر بوده
- * و در مدت thresholdMs پاسخی دریافت نکرده‌اند.
- * همچنین از ارسال یادآوری تکراری جلوگیری می‌کند.
- */
+export function setAdminUserActionTarget(adminId: number, userId: number): void {
+  adminUserActionTarget.set(adminId, userId);
+}
+export function getAdminUserActionTarget(adminId: number): number | undefined {
+  return adminUserActionTarget.get(adminId);
+}
+
+// ── Ticket Reminders ──────────────────────────────────────────────────────────
 export function getTicketsNeedingReminder(thresholdMs: number): SupportTicket[] {
   const now = Date.now();
   const result: SupportTicket[] = [];
@@ -370,7 +387,6 @@ export function getTicketsNeedingReminder(thresholdMs: number): SupportTicket[] 
     if (lastMsg.from !== "user") continue;
     const timeSinceLastMsg = now - lastMsg.at.getTime();
     if (timeSinceLastMsg < thresholdMs) continue;
-    // اگر قبلاً یادآوری فرستاده شده، تا یک بازه دیگر صبر می‌کنیم
     if (ticket.lastReminderAt) {
       const timeSinceReminder = now - ticket.lastReminderAt.getTime();
       if (timeSinceReminder < thresholdMs) continue;
