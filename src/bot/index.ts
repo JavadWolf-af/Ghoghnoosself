@@ -513,6 +513,18 @@ bot.on("callback_query", async (query) => {
       await sendPanel(chatId, ADMIN_MSG_PROMPT(), { parse_mode: "Markdown", reply_markup: cancelKeyboard() });
       return;
     }
+    if (data.startsWith("user:addbal:")) {
+      const targetId = parseInt(data.replace("user:addbal:", ""), 10);
+      const target   = await getUser(targetId);
+      if (!target) {
+        await sendTracked(chatId, ADMIN_USER_NOT_FOUND(), { parse_mode: "Markdown" });
+        return;
+      }
+      setAdminBalanceTarget(userId, targetId);
+      setPending(userId, "adminAddBalanceAmount");
+      await sendPanel(chatId, ADMIN_ADD_BALANCE_AMOUNT_PROMPT(target.firstName), { parse_mode: "Markdown", reply_markup: cancelKeyboard() });
+      return;
+    }
     if (data === "broadcast:confirm") {
       clearAllPending(userId);
       const text = pendingBroadcastText.get(chatId);
