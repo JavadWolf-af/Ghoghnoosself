@@ -86,7 +86,12 @@ const balanceRequests = new Map<string, BalanceRequest>(Object.entries(persisted
 let cardNumber        = persisted.cardNumber ?? "";
 
 function generateReferralCode(userId: number): string { return `REF${userId}`; }
-function generateId(): string { return Math.random().toString(36).slice(2, 10).toUpperCase(); }
+
+function generateId(): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const part  = () => Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+  return `${part()}${part()}`;
+}
 
 function generateTokenCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -173,7 +178,8 @@ export function getTokenCount(): number { return tokens.size; }
 export function getUnusedTokenCount(): number { return Array.from(tokens.values()).filter((t) => !t.isUsed).length; }
 
 export function createBalanceRequest(userId: number, amount: number): string {
-  const id = generateId();
+  let id = generateId();
+  while (balanceRequests.has(id)) id = generateId();
   balanceRequests.set(id, { id, userId, amount, requestedAt: new Date(), status: "pending" });
   saveData(); return id;
 }
@@ -204,13 +210,16 @@ export function transferBalance(
 export function setCardNumber(card: string): void { cardNumber = card; saveData(); }
 export function getCardNumber(): string { return cardNumber; }
 
-type PendingSet = "broadcast" | "tokenEntry" | "addBalance" | "transferInput"
-  | "cardNumberInput" | "adminTransfer" | "adminAddBalance" | "adminAddBalanceAmount" | "adminMessageUser";
+type PendingSet =
+  | "broadcast" | "tokenEntry" | "addBalance" | "transferInput"
+  | "cardNumberInput" | "adminTransfer" | "adminAddBalance" | "adminAddBalanceAmount"
+  | "adminMessageUser" | "support" | "blockedSupport";
 
 const SETS: Record<PendingSet, Set<number>> = {
   broadcast: new Set(), tokenEntry: new Set(), addBalance: new Set(),
   transferInput: new Set(), cardNumberInput: new Set(), adminTransfer: new Set(),
   adminAddBalance: new Set(), adminAddBalanceAmount: new Set(), adminMessageUser: new Set(),
+  support: new Set(), blockedSupport: new Set(),
 };
 
 const addBalanceData     = new Map<number, { amount: number; receiptId: string }>();
