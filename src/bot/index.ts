@@ -5,8 +5,9 @@ import {
   adminMainKeyboard, adminManageKeyboard,
   cancelKeyboard, blockedKeyboard,
   channelCheckKeyboard,
-  depositReviewKeyboard, ticketKeyboard, unblockKeyboard, adminUserActionKeyboard,
-  broadcastConfirmKeyboard,
+  depositReviewKeyboard, depositReviewWithRestoreKeyboard,
+  ticketKeyboard, unblockKeyboard, adminUserActionKeyboard,
+  broadcastConfirmKeyboard, tokenCostKeyboard, graceTokenRestoreKeyboard,
 } from "./keyboards";
 import {
   WELCOME_MESSAGE, MAIN_MENU_MESSAGE, NOT_MEMBER_MESSAGE, MEMBERSHIP_CHECK_FAILED_MESSAGE,
@@ -35,6 +36,11 @@ import {
   USER_NO_OPEN_TICKET, USER_OPEN_TICKET,
   ADMIN_OPEN_TICKETS_HEADER, ADMIN_OPEN_TICKET_ITEM,
   ADMIN_SEARCH_USER_PROMPT, ADMIN_SEARCH_USER_NOT_FOUND, ADMIN_USER_PROFILE_ADMIN,
+  ADMIN_TOKEN_COST_MESSAGE, TOKEN_COST_PROMPT, TOKEN_COST_SET,
+  BALANCE_LOW_WARNING, BALANCE_CRITICAL_WARNING,
+  TOKEN_GRACE_STARTED, TOKEN_GRACE_REMINDER, TOKEN_EXPIRED_NOTIFY,
+  ADMIN_GRACE_TOKENS_HEADER, ADMIN_GRACE_TOKEN_ITEM, ADMIN_TOKEN_RESTORED,
+  ADMIN_BILLING_REPORT,
 } from "./messages";
 import {
   addUser, getUser, getAllUsers, getBlockedUsers, getUserCount,
@@ -52,6 +58,8 @@ import {
   setAdminMessageTarget, getAdminMessageTarget,
   setAdminTicketTarget, getAdminTicketTarget,
   getTicketsNeedingReminder, markTicketReminded,
+  getTokenDailyCost, setTokenDailyCost, getActiveTokenCount,
+  getGraceTokens, getTokenByUserId, restoreTokenFromGrace, runDailyBilling,
 } from "./store";
 
 const BOT_TOKEN           = process.env["TELEGRAM_BOT_TOKEN"];
@@ -111,6 +119,37 @@ setTimeout(() => {
     checkUnansweredTickets().catch((err) => logger.error({ err }, "Reminder check error"));
   }, CHECK_INTERVAL_MS);
 }, 5 * 60 * 1000);
+
+
+// ── صورتحساب روزانه توکن ──────────────────────────────────────────────────────
+async function runBilling(): Promise<void> {
+  try {
+    const result = await runDailyBilling();
+    for (const n of result.notifications) {
+      let msg = '';
+      if (n.type === 'low')            msg = BALANCE_LOW_WARNING(n.daysLeft ?? 6);
+      else if (n.type === 'critical')  msg = BALANCE_CRITICAL_WARNING(n.daysLeft ?? 3);
+      else if (n.type === 'grace_started') msg = TOKEN_GRACE_STARTED(n.daysLeft ?? 10);
+      else if (n.type === 'grace_reminder') msg = TOKEN_GRACE_REMINDER(n.daysLeft ?? 1);
+      else if (n.type === 'expired')   msg = TOKEN_EXPIRED_NOTIFY();
+      if (msg) await safeSend(() => bot.sendMessage(n.userId, msg, { parse_mode: 'Markdown', reply_markup: userMainKeyboard() }), 'billing:' + n.userId);
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    if (result.billed > 0 || result.graceStarted > 0 || result.expired > 0) {
+      for (const adminId of ADMIN_IDS) {
+        await safeSend(() => bot.sendMessage(adminId, ADMIN_BILLING_REPORT(result.billed, result.graceStarted, result.expired), { parse_mode: 'Markdown' }), 'billingReport:' + adminId);
+      }
+    }
+    logger.info({ ...result }, 'Daily billing complete');
+  } catch (err) { logger.error({ err }, 'Daily billing error'); }
+}
+
+function scheduleDaily(fn: () => void, hour = 0, minute = 0): void {
+  const now  = new Date();
+  const next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, hour, minute, 0, 0);
+  setTimeout(() => { fn(); setInterval(fn, 24 * 60 * 60 * 1000); }, next.getTime() - now.getTime());
+}
+scheduleDaily(() => { runBilling().catch((err) => logger.error({ err }, 'Billing scheduler error')); }, 1, 0);
 
 // ── Panel message tracking ────────────────────────────────────────────────────
 const panelMsgs = new Map<number, number[]>();
@@ -230,10 +269,14 @@ async function notifyAdminsDeposit(
   requestId: string, amount: number, userId: number,
   firstName: string, username: string | undefined, receiptFileId: string,
 ): Promise<void> {
-  const caption = ADMIN_DEPOSIT_REVIEW(requestId, amount, userId, firstName, username);
+  const caption    = ADMIN_DEPOSIT_REVIEW(requestId, amount, userId, firstName, username);
+  const graceToken = await getTokenByUserId(userId);
+  const keyboard   = graceToken && graceToken.status === 'grace'
+    ? depositReviewWithRestoreKeyboard(requestId, userId, graceToken.code)
+    : depositReviewKeyboard(requestId, userId);
   for (const adminId of ADMIN_IDS) {
     try {
-      await bot.sendPhoto(adminId, receiptFileId, { caption, parse_mode: "Markdown", reply_markup: depositReviewKeyboard(requestId, userId) });
+      await bot.sendPhoto(adminId, receiptFileId, { caption, parse_mode: "Markdown", reply_markup: keyboard });
     } catch (err) { logger.warn({ adminId, err }, "Failed to notify admin of deposit"); }
   }
 }
@@ -431,6 +474,38 @@ bot.on("callback_query", async (query) => {
         await sendPanel(chatId, ADMIN_SEARCH_USER_PROMPT(), { parse_mode: "Markdown", reply_markup: cancelKeyboard() });
         return;
       }
+      if (nav === "admin_token_cost") {
+        const [daily, activeCount, graceCount] = await Promise.all([
+          getTokenDailyCost(), getActiveTokenCount(),
+          getGraceTokens().then(t => t.length),
+        ]);
+        const monthly = daily * 30;
+        await sendPanel(chatId, ADMIN_TOKEN_COST_MESSAGE(daily, monthly, activeCount, graceCount), { parse_mode: "Markdown", reply_markup: tokenCostKeyboard() });
+        return;
+      }
+      if (nav === "admin_set_token_cost") {
+        setPending(userId, "tokenCostInput");
+        await sendPanel(chatId, TOKEN_COST_PROMPT(), { parse_mode: "Markdown", reply_markup: cancelKeyboard() });
+        return;
+      }
+      if (nav === "admin_grace_tokens") {
+        const graceTokens = await getGraceTokens();
+        await sendPanel(chatId, ADMIN_GRACE_TOKENS_HEADER(graceTokens.length), { parse_mode: "Markdown", reply_markup: adminManageKeyboard() });
+        const GRACE_MS_LOCAL = 10 * 24 * 60 * 60 * 1000;
+        for (const token of graceTokens.slice(0, 15)) {
+          if (!token.usedByUserId || !token.graceStartedAt) continue;
+          const user = await getUser(token.usedByUserId);
+          const graceAge = Date.now() - token.graceStartedAt.getTime();
+          const daysLeft = Math.max(0, 10 - Math.floor(graceAge / (24 * 60 * 60 * 1000)));
+          const itemText = ADMIN_GRACE_TOKEN_ITEM(
+            token.code, token.usedByUserId,
+            user?.firstName ?? String(token.usedByUserId),
+            user?.username, token.graceStartedAt, daysLeft,
+          );
+          await sendTracked(chatId, itemText, { parse_mode: "Markdown", reply_markup: graceTokenRestoreKeyboard(token.code, token.usedByUserId) });
+        }
+        return;
+      }
       if (nav === "admin_open_tickets") {
         const openTickets = await getAllOpenTickets();
         await sendPanel(chatId, ADMIN_OPEN_TICKETS_HEADER(openTickets.length), { parse_mode: "Markdown", reply_markup: adminManageKeyboard() });
@@ -453,6 +528,38 @@ bot.on("callback_query", async (query) => {
 
   // ── Admin action callbacks ─────────────────────────────────────────────────
   if (isAdmin(userId)) {
+    if (data.startsWith("deposit:approve_restore:")) {
+      const parts = data.replace("deposit:approve_restore:", "").split(":");
+      const requestId = parts[0];
+      const tokenCode = parts.slice(1).join(":");
+      const result    = await approveBalanceRequest(requestId);
+      if (result.ok && result.userId && result.amount) {
+        const restored   = await restoreTokenFromGrace(tokenCode);
+        const newBalance = await getUserBalance(result.userId);
+        const user       = await getUser(result.userId);
+        await safeSend(() => bot.sendMessage(result.userId, BALANCE_APPROVED_USER(result.amount, newBalance), { parse_mode: "Markdown", reply_markup: userMainKeyboard() }), "approve:" + result.userId);
+        if (restored && user) {
+          await safeSend(() => bot.sendMessage(result.userId, "✅ *توکن شما بازگردانده شد*\n\nموجودی شارژ و توکن شما مجدداً فعال شد.", { parse_mode: "Markdown" }), "restore:" + result.userId);
+          await sendTracked(chatId, ADMIN_TOKEN_RESTORED(user.firstName, result.userId), { parse_mode: "Markdown" });
+        }
+        if (msgId) await bot.editMessageCaption(ADMIN_DEPOSIT_APPROVED(requestId), { chat_id: chatId, message_id: msgId, parse_mode: "Markdown" }).catch(() => {});
+      }
+      return;
+    }
+    if (data.startsWith("token:restore:")) {
+      const parts     = data.replace("token:restore:", "").split(":");
+      const tokenCode = parts[0];
+      const targetId  = parseInt(parts[1], 10);
+      const restored  = await restoreTokenFromGrace(tokenCode);
+      const user      = await getUser(targetId);
+      if (restored && user) {
+        await safeSend(() => bot.sendMessage(targetId, "✅ *توکن شما بازگردانده شد*\n\nادمین توکن شما را بازگرداند. سرویس شما ادامه دارد.", { parse_mode: "Markdown", reply_markup: userMainKeyboard() }), "restore:" + targetId);
+        await sendTracked(chatId, ADMIN_TOKEN_RESTORED(user.firstName, targetId), { parse_mode: "Markdown" });
+      } else {
+        await sendTracked(chatId, "❌ بازگردانی ناموفق — توکن در وضعیت گریس نیست.", { parse_mode: "Markdown" });
+      }
+      return;
+    }
     if (data.startsWith("deposit:approve:")) {
       const requestId = data.replace("deposit:approve:", "");
       const result    = await approveBalanceRequest(requestId);
@@ -668,6 +775,20 @@ bot.on("message", async (msg) => {
         setPending(userId, "adminAddBalanceAmount");
         setAdminBalanceTarget(userId, targetId);
         await sendPanel(chatId, ADMIN_ADD_BALANCE_AMOUNT_PROMPT(targetUser.firstName), { parse_mode: "Markdown", reply_markup: cancelKeyboard() });
+        return;
+      }
+      if (isPending(userId, "tokenCostInput")) {
+        clearAllPending(userId);
+        const raw    = parseInt(text.trim().replace(/\D/g, ""), 10);
+        const amount = isNaN(raw) ? -1 : raw;
+        if (amount < 0) {
+          await sendAdminManage(chatId);
+          await sendTracked(chatId, "❌ مبلغ نامعتبر است. یک عدد صحیح وارد کنید.", { parse_mode: "Markdown" });
+          return;
+        }
+        await setTokenDailyCost(amount);
+        await sendAdminManage(chatId);
+        await sendTracked(chatId, TOKEN_COST_SET(amount, amount * 30), { parse_mode: "Markdown" });
         return;
       }
       if (isPending(userId, "adminAddBalanceAmount")) {
