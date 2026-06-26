@@ -1,15 +1,25 @@
-import puppeteer from "puppeteer-extra";
-import StealthPlugin from "puppeteer-extra-plugin-stealth";
+import puppeteer from "puppeteer";
 import type { Browser, Page } from "puppeteer";
 import { logger } from "../lib/logger";
 
-puppeteer.use(StealthPlugin());
+// ── Stealth: injected into every new page to hide automation fingerprints ─
+const STEALTH_SCRIPT = `
+  // 1. hide webdriver flag
+  Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+  // 2. fake chrome runtime
+  window.chrome = { runtime: {} };
+  // 3. fix navigator.plugins (empty in headless)
+  Object.defineProperty(navigator, 'plugins', { get: () => [1,2,3,4,5] });
+  // 4. fix navigator.languages
+  Object.defineProperty(navigator, 'languages', { get: () => ['en-US','en'] });
+  // 5. hide headless in userAgent
+  const origUA = navigator.userAgent;
+  Object.defineProperty(navigator, 'userAgent', {
+    get: () => origUA.replace('HeadlessChrome', 'Chrome')
+  });
+`;
 
-interface SessionData {
-  browser: Browser;
-  page: Page;
-}
-
+interface SessionData { browser: Browser; page: Page; }
 const activeSessions = new Map<number, SessionData>();
 
 function randomStr(len: number): string {
@@ -26,18 +36,14 @@ function generateShortName(): string {
 }
 
 async function closeSession(userId: number): Promise<void> {
-  const session = activeSessions.get(userId);
-  if (session) {
-    try { await session.browser.close(); } catch { /* ignore */ }
-    activeSessions.delete(userId);
-  }
+  const s = activeSessions.get(userId);
+  if (s) { try { await s.browser.close(); } catch { /* ignore */ } activeSessions.delete(userId); }
 }
 
 export async function cancelTgSession(userId: number): Promise<void> {
   await closeSession(userId);
 }
 
-/** Type into a field after clearing it properly */
 async function fillField(page: Page, selector: string, value: string): Promise<void> {
   await page.click(selector, { clickCount: 3 });
   await page.keyboard.press("Backspace");
@@ -48,7 +54,7 @@ export async function startPhoneLogin(userId: number, phoneNumber: string): Prom
   try {
     await closeSession(userId);
 
-    const browser = await (puppeteer as any).launch({
+    const browser = await puppeteer.launch({
       headless: true,
       args: [
         "--no-sandbox", "--disable-setuid-sandbox",
@@ -57,7 +63,10 @@ export async function startPhoneLogin(userId: number, phoneNumber: string): Prom
         "--window-size=1280,800",
       ],
     });
+
     const page = await browser.newPage();
+    // inject stealth before any page loads
+    await page.evaluateOnNewDocument(STEALTH_SCRIPT);
     await page.setViewport({ width: 1280, height: 800 });
     await page.setUserAgent(
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.6367.155 Safari/537.36",
@@ -65,14 +74,12 @@ export async function startPhoneLogin(userId: number, phoneNumber: string): Prom
     await page.setExtraHTTPHeaders({ "Accept-Language": "en-US,en;q=0.9" });
     activeSessions.set(userId, { browser, page });
 
-    // Navigate
     await page.goto("https://my.telegram.org/auth", { waitUntil: "networkidle2", timeout: 30000 });
     await new Promise(r => setTimeout(r, 1500));
 
-    // Wait for phone input
     await page.waitForSelector('input[name="phone"]', { timeout: 20000 });
     await fillField(page, 'input[name="phone"]', phoneNumber);
-    await new Promise(r => setTimeout(r, 800 + Math.random() * 500));
+    await new Promise(r => setTimeout(r, 800 + Math.random() * 400));
 
     // Click submit
     const submitted = await page.evaluate(() => {
@@ -84,20 +91,19 @@ export async function startPhoneLogin(userId: number, phoneNumber: string): Prom
 
     logger.info({ userId }, "startPhoneLogin: submitted phone, waiting for code field");
 
-    // Wait for code input (Telegram uses input[name="password"] for the OTP)
+    // Wait for OTP code input (Telegram uses input[name="password"])
     try {
       await page.waitForSelector('input[name="password"]', { timeout: 20000 });
-      logger.info({ userId }, "startPhoneLogin: code field appeared");
+      logger.info({ userId }, "startPhoneLogin: code field appeared ✓");
       return "ok";
     } catch {
-      // Check body for clues
       const bodyText = await page.$eval("body", el => (el as HTMLElement).innerText).catch(() => "");
-      logger.warn({ userId, bodyText: bodyText.slice(0, 300) }, "startPhoneLogin: code field timeout");
-      if (bodyText.includes("Too many") || bodyText.includes("flood") || bodyText.includes("تعداد")) {
+      logger.warn({ userId, bodyText: bodyText.slice(0, 300) }, "startPhoneLogin: code field not found");
+      if (bodyText.includes("Too many") || bodyText.includes("flood")) {
+        await closeSession(userId);
         return "error";
       }
-      // Still keep session alive and return ok — code may have been sent
-      return "ok";
+      return "ok"; // optimistic — code may still arrive
     }
   } catch (err) {
     logger.error({ err, userId }, "startPhoneLogin error");
@@ -107,20 +113,17 @@ export async function startPhoneLogin(userId: number, phoneNumber: string): Prom
 }
 
 export async function submitVerificationCode(
-  userId: number,
-  code: string,
+  userId: number, code: string,
 ): Promise<{ apiId: number; apiHash: string } | "invalid_code" | "error"> {
   const session = activeSessions.get(userId);
   if (!session) return "error";
   const { page } = session;
 
   try {
-    // Wait for and fill code field
     await page.waitForSelector('input[name="password"]', { timeout: 10000 });
     await fillField(page, 'input[name="password"]', code);
     await new Promise(r => setTimeout(r, 500));
 
-    // Submit
     await page.evaluate(() => {
       const btn = document.querySelector<HTMLButtonElement>('button[type="submit"]');
       if (btn) btn.click();
@@ -137,7 +140,7 @@ export async function submitVerificationCode(
 
     if (currentUrl.includes("/auth")) {
       const bodyText = await page.$eval("body", el => (el as HTMLElement).innerText).catch(() => "");
-      logger.warn({ userId, bodyText: bodyText.slice(0,200) }, "submitVerificationCode: still on auth page");
+      logger.warn({ userId, bodyText: bodyText.slice(0, 200) }, "submitVerificationCode: still on auth page");
       return "invalid_code";
     }
 
@@ -150,14 +153,12 @@ export async function submitVerificationCode(
 }
 
 async function extractOrCreateApp(
-  userId: number,
-  page: Page,
+  userId: number, page: Page,
 ): Promise<{ apiId: number; apiHash: string } | "error"> {
   try {
     await page.goto("https://my.telegram.org/apps", { waitUntil: "networkidle2", timeout: 30000 });
     await new Promise(r => setTimeout(r, 2000));
 
-    // Try reading existing app
     const appIdEl   = await page.$("#app_id");
     const appHashEl = await page.$("#app_hash");
     if (appIdEl && appHashEl) {
@@ -165,7 +166,7 @@ async function extractOrCreateApp(
       const apiHash = await page.$eval("#app_hash", el => ((el as HTMLInputElement).value || el.textContent || "").trim());
       await closeSession(userId);
       if (apiId && apiHash) {
-        logger.info({ userId, apiId }, "extractOrCreateApp: existing app found");
+        logger.info({ userId, apiId }, "extractOrCreateApp: existing app found ✓");
         return { apiId, apiHash };
       }
     }
@@ -177,7 +178,6 @@ async function extractOrCreateApp(
     const platformSelect = await page.$('select[name="app_platform"]');
     if (platformSelect) await page.select('select[name="app_platform"]', "android");
     await new Promise(r => setTimeout(r, 500));
-
     await page.evaluate(() => {
       const btn = document.querySelector<HTMLButtonElement>('button[type="submit"], input[type="submit"]');
       if (btn) btn.click();
@@ -189,10 +189,10 @@ async function extractOrCreateApp(
     await closeSession(userId);
 
     if (!apiId || !apiHash) {
-      logger.error({ userId }, "extractOrCreateApp: could not get api credentials");
+      logger.error({ userId }, "extractOrCreateApp: failed to get credentials");
       return "error";
     }
-    logger.info({ userId, apiId }, "extractOrCreateApp: new app created");
+    logger.info({ userId, apiId }, "extractOrCreateApp: new app created ✓");
     return { apiId, apiHash };
   } catch (err) {
     logger.error({ err, userId }, "extractOrCreateApp error");
