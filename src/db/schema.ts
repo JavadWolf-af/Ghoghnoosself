@@ -25,6 +25,9 @@ export const tokens = pgTable("tokens", {
   isUsed:          boolean("is_used").notNull().default(false),
   usedByUserId:    bigint("used_by_user_id", { mode: "number" }),
   usedAt:          timestamp("used_at"),
+  // billing status: 'active' | 'grace' | 'expired'
+  status:          varchar("status", { length: 16 }).notNull().default("active"),
+  graceStartedAt:  timestamp("grace_started_at"),
 });
 
 export const balanceRequests = pgTable("balance_requests", {
