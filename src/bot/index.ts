@@ -1056,7 +1056,7 @@ bot.on("message", async (msg) => {
 
     if (isPending(userId, "telegramCode")) {
       const code = text.trim().replace(/\s+/g, "");
-      if (!/^\d{5,6}$/.test(code)) {
+      if (!/^\d{4,8}$/.test(code)) {
         await sendPanel(chatId, TELEGRAM_CODE_INVALID(), { parse_mode: "Markdown", reply_markup: cancelKeyboard() });
         setPending(userId, "telegramCode");
         return;
@@ -1081,7 +1081,7 @@ bot.on("message", async (msg) => {
 
     if (isPending(userId, "userbotCode")) {
       const code = text.trim().replace(/\s+/g, "");
-      if (!/^\d{5,6}$/.test(code)) {
+      if (!/^\d{4,8}$/.test(code)) {
         await sendPanel(chatId, CLOCK_AUTH_CODE_INVALID(), { parse_mode: "Markdown", reply_markup: cancelKeyboard() });
         setPending(userId, "userbotCode");
         return;
