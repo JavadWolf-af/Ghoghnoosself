@@ -23,7 +23,6 @@ async function buildAll() {
       "*.node",
       "bufferutil",
       "utf-8-validate",
-      "telegram",
       "pino-pretty",
       "thread-stream",
       "pino/file",
@@ -39,7 +38,7 @@ globalThis.__dirname = __path.dirname(globalThis.__filename);
 `,
     },
   });
-  console.log("✅ Build completed!");
+  console.log("\u2705 Build completed!");
 }
 
 buildAll().catch((err) => { console.error(err); process.exit(1); });
