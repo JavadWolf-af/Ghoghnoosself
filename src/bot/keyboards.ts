@@ -97,33 +97,7 @@ export const adminManageKeyboard = (): ReplyKeyboardMarkup => ({
   resize_keyboard: true,
 });
 
-// ── Admin Inline Keyboards ────────────────────────────────────────────────────
-
-export const adminMainInlineKeyboard = (): InlineKeyboardMarkup => ({
-  inline_keyboard: [
-    [{ text: "🛠 پنل مدیریت", callback_data: "adm_manage" }],
-    [{ text: "🚪 خروج از ادمین", callback_data: "adm_exit" }],
-  ],
-});
-
-export const adminManageInlineKeyboard = (): InlineKeyboardMarkup => ({
-  inline_keyboard: [
-    [{ text: "📊 آمار سیستم",    callback_data: "adm_stats" },    { text: "📣 پیام همگانی",    callback_data: "adm_broadcast" }],
-    [{ text: "🔑 توکن جدید",     callback_data: "adm_token" },    { text: "💳 شماره کارت",     callback_data: "adm_card" }],
-    [{ text: "💰 افزودن موجودی", callback_data: "adm_addbal" },   { text: "↔️ انتقال اعتبار", callback_data: "adm_transfer" }],
-    [{ text: "🎫 تیکت‌های باز",  callback_data: "adm_tickets" },  { text: "🚫 لیست مسدودها",  callback_data: "adm_blocked" }],
-    [{ text: "🔍 جستجوی کاربر",  callback_data: "adm_search" }],
-    [{ text: "⬅️ بازگشت",        callback_data: "adm_exit" }],
-  ],
-});
-
-export const adminBackInlineKeyboard = (): InlineKeyboardMarkup => ({
-  inline_keyboard: [[
-    { text: "⬅️ بازگشت به مدیریت", callback_data: "adm_back_manage" },
-  ]],
-});
-
-// ── User/Shared Inline Keyboards ──────────────────────────────────────────────
+// ── Inline Keyboards ──────────────────────────────────────────────────────────
 
 export const channelCheckKeyboard = (
   channelUrl: string,
