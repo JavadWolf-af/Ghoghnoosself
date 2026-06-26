@@ -180,14 +180,21 @@ export const ADD_BALANCE_AMOUNT_PROMPT = (): string =>
   `مبلغ واریز را *به تومان* وارد کنید:\n\n` +
   `↩️ برای انصراف 🔙 را بزنید`;
 
-export const ADD_BALANCE_RECEIPT = (receiptId: string, amount: number, cardNumber: string): string =>
+export const ADD_BALANCE_RECEIPT = (
+  receiptId: string,
+  amount: number,
+  cardNumber: string,
+  cardHolder: string,
+  cardBank: string,
+): string =>
   `🧾 *اطلاعات واریز*\n\n` +
   `━━━━━━━━━━━━━━━━━\n` +
   `🆔 شناسه رسید: \`${receiptId}\`\n` +
   `💵 مبلغ: *${amount.toLocaleString("fa-IR")} تومان*\n\n` +
   `━━━━━━━━━━━━━━━━━\n` +
-  `💳 شماره کارت برای واریز:\n` +
-  `\`${cardNumber || "هنوز توسط ادمین تنظیم نشده"}\`\n\n` +
+  `💳 شماره کارت:\n\`${cardNumber || "هنوز تنظیم نشده"}\`\n` +
+  (cardHolder ? `👤 صاحب حساب: *${cardHolder}*\n` : "") +
+  (cardBank   ? `🏦 بانک: *${cardBank}*\n`         : "") +
   `━━━━━━━━━━━━━━━━━\n` +
   `✅ پس از واریز، تصویر رسید بانکی را ارسال کنید.\n` +
   `📝 شناسه رسید را یادداشت کنید.\n\n` +
@@ -281,13 +288,32 @@ export const BROADCAST_SENT = (count: number): string =>
   `✅ پیام برای *${count}* کاربر ارسال شد.`;
 
 export const CARD_NUMBER_PROMPT = (): string =>
-  `💳 *تنظیم شماره کارت*\n\n` +
+  `💳 *تنظیم اطلاعات کارت — مرحله ۱/۳*\n\n` +
   `━━━━━━━━━━━━━━━━━\n` +
   `شماره کارت جدید را وارد کنید:\n\n` +
   `↩️ برای انصراف 🔙 را بزنید`;
 
-export const CARD_NUMBER_SET = (card: string): string =>
-  `✅ شماره کارت ذخیره شد:\n\`${card}\``;
+export const CARD_HOLDER_PROMPT = (card: string): string =>
+  `💳 *تنظیم اطلاعات کارت — مرحله ۲/۳*\n\n` +
+  `━━━━━━━━━━━━━━━━━\n` +
+  `شماره کارت: \`${card}\`\n\n` +
+  `نام و نام‌خانوادگی صاحب حساب را وارد کنید:\n\n` +
+  `↩️ برای انصراف 🔙 را بزنید`;
+
+export const CARD_BANK_PROMPT = (card: string, holder: string): string =>
+  `💳 *تنظیم اطلاعات کارت — مرحله ۳/۳*\n\n` +
+  `━━━━━━━━━━━━━━━━━\n` +
+  `شماره کارت: \`${card}\`\n` +
+  `صاحب حساب: *${holder}*\n\n` +
+  `نام بانک را وارد کنید (مثال: ملت، صادرات، تجارت):\n\n` +
+  `↩️ برای انصراف 🔙 را بزنید`;
+
+export const CARD_INFO_SET = (card: string, holder: string, bank: string): string =>
+  `✅ *اطلاعات کارت ذخیره شد*\n\n` +
+  `━━━━━━━━━━━━━━━━━\n` +
+  `💳 شماره کارت: \`${card}\`\n` +
+  `👤 صاحب حساب: *${holder}*\n` +
+  `🏦 بانک: *${bank}*`;
 
 export const BLOCKED_LIST_MESSAGE = (
   blockedUsers: Array<{ id: number; firstName: string; username?: string }>
