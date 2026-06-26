@@ -585,7 +585,7 @@ bot.on("photo", async (msg) => {
 
     const balanceData = getAddBalanceData(userId);
     if (!balanceData) {
-      await sendTracked(chatId, "⚠️ ابتدا مبلغ واریز را وارد کنید.", { parse_mode: "Markdown", reply_markup: backKeyboard() });
+      await sendTracked(chatId, "⚠️ ابتدا مبلغ واریز را وارد کنید.", { parse_mode: "Markdown", reply_markup: backToWalletInlineKeyboard() });
       return;
     }
     clearAllPending(userId);
@@ -595,7 +595,7 @@ bot.on("photo", async (msg) => {
     const user      = getUser(userId);
 
     await notifyAdminsDeposit(requestId, balanceData.amount, userId, firstName, user?.username, fileId);
-    await sendPanel(chatId, BALANCE_REQUEST_SENT(), { parse_mode: "Markdown", reply_markup: walletKeyboard() });
+    await sendPanel(chatId, BALANCE_REQUEST_SENT(), { parse_mode: "Markdown", reply_markup: walletInlineKeyboard() });
   } catch (err) { logger.error({ err }, "photo handler error"); }
 });
 
@@ -646,7 +646,7 @@ bot.on("message", async (msg) => {
         }
         addTicketMessage(ticketId, "admin", text);
         await safeSend(
-          () => bot.sendMessage(ticket.userId, TICKET_REPLY_USER(ticketId, text), { parse_mode: "Markdown", reply_markup: userMainKeyboard() }),
+          () => bot.sendMessage(ticket.userId, TICKET_REPLY_USER(ticketId, text), { parse_mode: "Markdown", reply_markup: userMainInlineKeyboard() }),
           `tktUser:${ticket.userId}`
         );
         await sendAdminManage(chatId);
@@ -722,7 +722,7 @@ bot.on("message", async (msg) => {
         }
         setPending(userId, "adminAddBalanceAmount");
         setAdminBalanceTarget(userId, targetId);
-        await sendPanel(chatId, ADMIN_ADD_BALANCE_AMOUNT_PROMPT(targetUser.firstName), { parse_mode: "Markdown", reply_markup: backKeyboard() });
+        await sendPanel(chatId, ADMIN_ADD_BALANCE_AMOUNT_PROMPT(targetUser.firstName), { parse_mode: "Markdown", reply_markup: adminBackInlineKeyboard() });
         return;
       }
 
@@ -740,7 +740,7 @@ bot.on("message", async (msg) => {
         const targetUser = getUser(targetId)!;
         const newBalance = getUserBalance(targetId);
         await safeSend(
-          () => bot.sendMessage(targetId, BALANCE_APPROVED_USER(amount, newBalance), { parse_mode: "Markdown", reply_markup: userMainKeyboard() }),
+          () => bot.sendMessage(targetId, BALANCE_APPROVED_USER(amount, newBalance), { parse_mode: "Markdown", reply_markup: userMainInlineKeyboard() }),
           `notify:${targetId}`
         );
         await sendAdminManage(chatId);
@@ -788,7 +788,7 @@ bot.on("message", async (msg) => {
       }
       if (text === MANAGE_BUTTONS.BROADCAST) {
         setPending(userId, "broadcast");
-        await sendPanel(chatId, BROADCAST_PROMPT(), { parse_mode: "Markdown", reply_markup: backKeyboard() });
+        await sendPanel(chatId, BROADCAST_PROMPT(), { parse_mode: "Markdown", reply_markup: adminBackInlineKeyboard() });
         return;
       }
       if (text === MANAGE_BUTTONS.ADD_TOKEN) {
@@ -799,17 +799,17 @@ bot.on("message", async (msg) => {
       }
       if (text === MANAGE_BUTTONS.CARD_NUMBER) {
         setPending(userId, "cardNumberInput");
-        await sendPanel(chatId, CARD_NUMBER_PROMPT(), { parse_mode: "Markdown", reply_markup: backKeyboard() });
+        await sendPanel(chatId, CARD_NUMBER_PROMPT(), { parse_mode: "Markdown", reply_markup: adminBackInlineKeyboard() });
         return;
       }
       if (text === MANAGE_BUTTONS.ADD_BALANCE) {
         setPending(userId, "adminAddBalance");
-        await sendPanel(chatId, ADMIN_ADD_BALANCE_PROMPT(), { parse_mode: "Markdown", reply_markup: backKeyboard() });
+        await sendPanel(chatId, ADMIN_ADD_BALANCE_PROMPT(), { parse_mode: "Markdown", reply_markup: adminBackInlineKeyboard() });
         return;
       }
       if (text === MANAGE_BUTTONS.TRANSFER_USER) {
         setPending(userId, "adminTransfer");
-        await sendPanel(chatId, ADMIN_TRANSFER_PROMPT(), { parse_mode: "Markdown", reply_markup: backKeyboard() });
+        await sendPanel(chatId, ADMIN_TRANSFER_PROMPT(), { parse_mode: "Markdown", reply_markup: adminBackInlineKeyboard() });
         return;
       }
       if (text === MANAGE_BUTTONS.BLOCKED_LIST) {
@@ -827,7 +827,7 @@ bot.on("message", async (msg) => {
       }
       if (text === MANAGE_BUTTONS.SEARCH_USER) {
         setPending(userId, "adminSearchUser");
-        await sendPanel(chatId, ADMIN_SEARCH_USER_PROMPT(), { parse_mode: "Markdown", reply_markup: backKeyboard() });
+        await sendPanel(chatId, ADMIN_SEARCH_USER_PROMPT(), { parse_mode: "Markdown", reply_markup: adminBackInlineKeyboard() });
         return;
       }
       if (text === MANAGE_BUTTONS.OPEN_TICKETS) {
@@ -871,14 +871,14 @@ bot.on("message", async (msg) => {
             `blockedSupport:${adminId}`
           );
         }
-        await sendTracked(chatId, BLOCKED_SUPPORT_SENT(), { parse_mode: "Markdown", reply_markup: blockedKeyboard() });
+        await sendTracked(chatId, BLOCKED_SUPPORT_SENT(), { parse_mode: "Markdown", reply_markup: blockedInlineKeyboard() });
         return;
       }
       if (text === USER_BUTTONS.SUPPORT) {
         setPending(userId, "blockedSupport");
-        await sendTracked(chatId, BLOCKED_SUPPORT_PROMPT(), { parse_mode: "Markdown", reply_markup: blockedKeyboard() });
+        await sendTracked(chatId, BLOCKED_SUPPORT_PROMPT(), { parse_mode: "Markdown", reply_markup: blockedInlineKeyboard() });
       } else {
-        await sendTracked(chatId, BLOCKED_ONLY_SUPPORT(), { parse_mode: "Markdown", reply_markup: blockedKeyboard() });
+        await sendTracked(chatId, BLOCKED_ONLY_SUPPORT(), { parse_mode: "Markdown", reply_markup: blockedInlineKeyboard() });
       }
       return;
     }
@@ -890,15 +890,15 @@ bot.on("message", async (msg) => {
     if (isPending(userId, "tokenEntry")) {
       clearAllPending(userId);
       if (isUserActivated(userId)) {
-        await sendPanel(chatId, TOKEN_ALREADY_ACTIVATED_MESSAGE(), { parse_mode: "Markdown", reply_markup: userMainKeyboard() });
+        await sendPanel(chatId, TOKEN_ALREADY_ACTIVATED_MESSAGE(), { parse_mode: "Markdown", reply_markup: userMainInlineKeyboard() });
         return;
       }
       const result = validateAndUseToken(text, userId);
       if (result.valid) {
-        await sendPanel(chatId, TOKEN_SUCCESS_MESSAGE(firstName), { parse_mode: "Markdown", reply_markup: userMainKeyboard() });
+        await sendPanel(chatId, TOKEN_SUCCESS_MESSAGE(firstName), { parse_mode: "Markdown", reply_markup: userMainInlineKeyboard() });
       } else {
         const errMsg = result.reason === "already_used" ? TOKEN_ALREADY_USED_MESSAGE() : TOKEN_INVALID_MESSAGE();
-        await sendPanel(chatId, errMsg, { parse_mode: "Markdown", reply_markup: userMainKeyboard() });
+        await sendPanel(chatId, errMsg, { parse_mode: "Markdown", reply_markup: userMainInlineKeyboard() });
       }
       return;
     }
@@ -912,28 +912,28 @@ bot.on("message", async (msg) => {
       if (existingTicket) {
         addTicketMessage(existingTicket.id, "user", text);
         await notifyAdminsTicket(existingTicket.id, userId, firstName, user?.username, text, true);
-        await sendPanel(chatId, TICKET_ADDED_USER(existingTicket.id), { parse_mode: "Markdown", reply_markup: userMainKeyboard() });
+        await sendPanel(chatId, TICKET_ADDED_USER(existingTicket.id), { parse_mode: "Markdown", reply_markup: userMainInlineKeyboard() });
       } else {
         const ticket = createSupportTicket(userId, text);
         await notifyAdminsTicket(ticket.id, userId, firstName, user?.username, text, false);
-        await sendPanel(chatId, TICKET_CREATED_USER(ticket.id), { parse_mode: "Markdown", reply_markup: userMainKeyboard() });
+        await sendPanel(chatId, TICKET_CREATED_USER(ticket.id), { parse_mode: "Markdown", reply_markup: userMainInlineKeyboard() });
       }
       return;
     }
 
     if (isPending(userId, "addBalance")) {
       if (getAddBalanceData(userId)) {
-        await sendTracked(chatId, "📸 لطفاً تصویر رسید واریز را ارسال کنید.\nبرای لغو 🔙 را بزنید.", { parse_mode: "Markdown", reply_markup: backKeyboard() });
+        await sendTracked(chatId, "📸 لطفاً تصویر رسید واریز را ارسال کنید.\nبرای لغو دکمه بازگشت را بزنید.", { parse_mode: "Markdown", reply_markup: backToWalletInlineKeyboard() });
         return;
       }
       const amount = parseInt(text.replace(/\D/g, ""), 10);
       if (!amount || amount <= 0) {
-        await sendTracked(chatId, "❌ مبلغ نامعتبر است. یک عدد صحیح وارد کنید.", { parse_mode: "Markdown", reply_markup: backKeyboard() });
+        await sendTracked(chatId, "❌ مبلغ نامعتبر است. یک عدد صحیح وارد کنید.", { parse_mode: "Markdown", reply_markup: backToWalletInlineKeyboard() });
         return;
       }
       const receiptId = Math.random().toString(36).slice(2, 10).toUpperCase();
       setAddBalanceData(userId, amount, receiptId);
-      await sendPanel(chatId, ADD_BALANCE_RECEIPT(receiptId, amount, getCardNumber()), { parse_mode: "Markdown", reply_markup: backKeyboard() });
+      await sendPanel(chatId, ADD_BALANCE_RECEIPT(receiptId, amount, getCardNumber()), { parse_mode: "Markdown", reply_markup: backToWalletInlineKeyboard() });
       return;
     }
 
@@ -941,24 +941,24 @@ bot.on("message", async (msg) => {
       clearAllPending(userId);
       const parts = text.trim().split(/\s+/);
       if (parts.length !== 2) {
-        await sendPanel(chatId, TRANSFER_FAILED("invalid_format"), { parse_mode: "Markdown", reply_markup: walletKeyboard() });
+        await sendPanel(chatId, TRANSFER_FAILED("invalid_format"), { parse_mode: "Markdown", reply_markup: walletInlineKeyboard() });
         return;
       }
       const toId   = parseInt(parts[0]!, 10);
       const amount = parseInt(parts[1]!, 10);
       if (isNaN(toId) || isNaN(amount) || amount <= 0) {
-        await sendPanel(chatId, TRANSFER_FAILED("invalid_amount"), { parse_mode: "Markdown", reply_markup: walletKeyboard() });
+        await sendPanel(chatId, TRANSFER_FAILED("invalid_amount"), { parse_mode: "Markdown", reply_markup: walletInlineKeyboard() });
         return;
       }
       const result = transferBalance(userId, toId, amount);
       if (result.ok) {
-        await sendPanel(chatId, TRANSFER_SUCCESS(toId, amount), { parse_mode: "Markdown", reply_markup: walletKeyboard() });
+        await sendPanel(chatId, TRANSFER_SUCCESS(toId, amount), { parse_mode: "Markdown", reply_markup: walletInlineKeyboard() });
         await safeSend(
           () => bot.sendMessage(toId, `💸 *اعتبار دریافت شد*\n\n${amount.toLocaleString("fa-IR")} تومان از کاربر \`${userId}\` دریافت کردید.`, { parse_mode: "Markdown" }),
           `trNotify:${toId}`
         );
       } else {
-        await sendPanel(chatId, TRANSFER_FAILED(result.reason ?? "unknown"), { parse_mode: "Markdown", reply_markup: walletKeyboard() });
+        await sendPanel(chatId, TRANSFER_FAILED(result.reason ?? "unknown"), { parse_mode: "Markdown", reply_markup: walletInlineKeyboard() });
       }
       return;
     }
@@ -973,7 +973,7 @@ bot.on("message", async (msg) => {
     }
     if (text === WALLET_BUTTONS.ADD_BALANCE) {
       setPending(userId, "addBalance");
-      await sendPanel(chatId, ADD_BALANCE_AMOUNT_PROMPT(), { parse_mode: "Markdown", reply_markup: backKeyboard() });
+      await sendPanel(chatId, ADD_BALANCE_AMOUNT_PROMPT(), { parse_mode: "Markdown", reply_markup: backToWalletInlineKeyboard() });
       return;
     }
     if (text === WALLET_BUTTONS.TRANSFER) {
@@ -983,42 +983,42 @@ bot.on("message", async (msg) => {
         return;
       }
       setPending(userId, "transferInput");
-      await sendPanel(chatId, TRANSFER_PROMPT(), { parse_mode: "Markdown", reply_markup: backKeyboard() });
+      await sendPanel(chatId, TRANSFER_PROMPT(), { parse_mode: "Markdown", reply_markup: backToWalletInlineKeyboard() });
       return;
     }
     if (text === USER_BUTTONS.REFERRAL) {
       const user = getUser(userId);
       if (!user) { await sendMainMenu(chatId, firstName); return; }
-      await sendPanel(chatId, REFERRAL_MESSAGE(user, BOT_USERNAME), { parse_mode: "Markdown", reply_markup: referralKeyboard() });
+      await sendPanel(chatId, REFERRAL_MESSAGE(user, BOT_USERNAME), { parse_mode: "Markdown", reply_markup: backToMainInlineKeyboard() });
       return;
     }
     if (text === USER_BUTTONS.PROFILE) {
       const user = getUser(userId);
       if (!user) { await sendMainMenu(chatId, firstName); return; }
-      await sendPanel(chatId, PROFILE_MESSAGE(user), { parse_mode: "Markdown", reply_markup: profileKeyboard() });
+      await sendPanel(chatId, PROFILE_MESSAGE(user), { parse_mode: "Markdown", reply_markup: backToMainInlineKeyboard() });
       return;
     }
     if (text === USER_BUTTONS.SUPPORT) {
       setPending(userId, "support");
-      await sendPanel(chatId, SUPPORT_PROMPT(), { parse_mode: "Markdown", reply_markup: backKeyboard() });
+      await sendPanel(chatId, SUPPORT_PROMPT(), { parse_mode: "Markdown", reply_markup: backToMainInlineKeyboard() });
       return;
     }
     if (text === USER_BUTTONS.OPEN_TICKETS) {
       const ticket = getOpenTicketByUser(userId);
       if (!ticket) {
-        await sendPanel(chatId, USER_NO_OPEN_TICKET(), { parse_mode: "Markdown", reply_markup: userMainKeyboard() });
+        await sendPanel(chatId, USER_NO_OPEN_TICKET(), { parse_mode: "Markdown", reply_markup: userMainInlineKeyboard() });
       } else {
-        await sendPanel(chatId, USER_OPEN_TICKET(ticket.id, ticket.createdAt, ticket.messages), { parse_mode: "Markdown", reply_markup: userMainKeyboard() });
+        await sendPanel(chatId, USER_OPEN_TICKET(ticket.id, ticket.createdAt, ticket.messages), { parse_mode: "Markdown", reply_markup: userMainInlineKeyboard() });
       }
       return;
     }
     if (text === USER_BUTTONS.TOKEN) {
       if (isUserActivated(userId)) {
-        await sendPanel(chatId, TOKEN_ALREADY_ACTIVATED_MESSAGE(), { parse_mode: "Markdown", reply_markup: userMainKeyboard() });
+        await sendPanel(chatId, TOKEN_ALREADY_ACTIVATED_MESSAGE(), { parse_mode: "Markdown", reply_markup: userMainInlineKeyboard() });
         return;
       }
       setPending(userId, "tokenEntry");
-      await sendPanel(chatId, TOKEN_SECTION_MESSAGE(), { parse_mode: "Markdown", reply_markup: backKeyboard() });
+      await sendPanel(chatId, TOKEN_SECTION_MESSAGE(), { parse_mode: "Markdown", reply_markup: backToMainInlineKeyboard() });
       return;
     }
 
