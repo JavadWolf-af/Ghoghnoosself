@@ -731,7 +731,10 @@ export const TELEGRAM_PHONE_RECEIVED = (phone: string): string =>
 export const TELEGRAM_CODE_PROMPT = (): string =>
   `✅ *کد تأیید ارسال شد*\n\n` +
   `━━━━━━━━━━━━━━━━━\n` +
-  `کد ۵ رقمی که تلگرام برایتان فرستاد را اینجا وارد کنید:\n\n` +
+  `کد تأییدی که تلگرام برایتان فرستاد را اینجا وارد کنید:
+
+` +
+  `(کد را از پیام‌های تلگرام خود کپی کنید)\n\n` +
   `↩️ برای انصراف /start بزنید`;
 
 export const TELEGRAM_LOGIN_SUCCESS = (apiId: number, apiHash: string): string =>
