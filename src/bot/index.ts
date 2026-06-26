@@ -109,6 +109,7 @@ import TelegramBot from "node-telegram-bot-api";
 
   // ── Panel message tracking ────────────────────────────────────────────────────
   const panelMsgs = new Map<number, number[]>();
+const pendingBroadcastText = new Map<number, string>();
 
   async function deletePanelMsgs(chatId: number): Promise<void> {
     const ids = panelMsgs.get(chatId) ?? [];
@@ -314,7 +315,7 @@ import TelegramBot from "node-telegram-bot-api";
           else await sendAdminPanel(chatId);
         } else if (isUserBlocked(userId)) {
           clearAllPending(userId);
-          await sendPanel(chatId, BLOCKED_ONLY_SUPPORT(), { parse_mode: "Markdown", reply_markup: cancelKeyboard() });
+          await bot.sendMessage(chatId, BLOCKED_ONLY_SUPPORT(), { parse_mode: "Markdown", reply_markup: blockedKeyboard() });
         } else {
           const fromWallet = isPendingWallet(userId);
           clearAllPending(userId);
@@ -536,8 +537,9 @@ import TelegramBot from "node-telegram-bot-api";
 
     if (data === "bcast_confirm" || data === "bcast_cancel") {
       if (msgId) await bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: msgId }).catch(() => {});
-      if (data === "bcast_cancel") { await sendAdminManage(chatId); return; }
-      const broadcastText = (query.message as any)?._broadcastText as string | undefined ?? "";
+      if (data === "bcast_cancel") { pendingBroadcastText.delete(chatId); await sendAdminManage(chatId); return; }
+      const broadcastText = pendingBroadcastText.get(chatId) ?? "";
+      pendingBroadcastText.delete(chatId);
       const users = getAllUsers();
       let sent = 0;
       for (const user of users) {
@@ -563,6 +565,7 @@ import TelegramBot from "node-telegram-bot-api";
 
       const balanceData = getAddBalanceData(userId);
       if (!balanceData) {
+        await delMsg(chatId, msg.message_id);
         await sendPanel(chatId, "⚠️ ابتدا مبلغ واریز را وارد کنید.", { parse_mode: "Markdown", reply_markup: cancelKeyboard() });
         return;
       }
@@ -611,8 +614,8 @@ import TelegramBot from "node-telegram-bot-api";
         }
         if (isPending(userId, "broadcast")) {
           clearAllPending(userId);
+          pendingBroadcastText.set(chatId, text);
           const sentMsg = await bot.sendMessage(chatId, `📣 *پیش‌نمایش پیام همگانی:*\n\n${text}`, { parse_mode: "Markdown", reply_markup: broadcastConfirmKeyboard() });
-          (sentMsg as any)._broadcastText = text;
           panelMsgs.set(chatId, [...(panelMsgs.get(chatId) ?? []), sentMsg.message_id]);
           return;
         }
