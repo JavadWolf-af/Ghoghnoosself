@@ -598,16 +598,17 @@ bot.on("message", async (msg) => {
       }
       if (isPending(userId, "cardNumberInput")) {
         const card = text.trim();
-        setPendingCardNumber(userId, card);
-        setPending(userId, "cardHolderInput");
+        setPending(userId, "cardHolderInput");   // clearAllPending happens inside setPending
+        setPendingCardNumber(userId, card);        // set AFTER clear
         await sendPanel(chatId, CARD_HOLDER_PROMPT(card), { parse_mode: "Markdown", reply_markup: cancelKeyboard() });
         return;
       }
       if (isPending(userId, "cardHolderInput")) {
-        const card   = getPendingCardNumber(userId) ?? "";
+        const card   = getPendingCardNumber(userId) ?? "";  // read BEFORE setPending clears it
         const holder = text.trim();
-        setPendingCardHolder(userId, holder);
-        setPending(userId, "cardBankInput");
+        setPending(userId, "cardBankInput");      // clearAllPending happens inside — clears pendingCardNumber
+        setPendingCardNumber(userId, card);        // re-set card after clear
+        setPendingCardHolder(userId, holder);      // set holder after clear
         await sendPanel(chatId, CARD_BANK_PROMPT(card, holder), { parse_mode: "Markdown", reply_markup: cancelKeyboard() });
         return;
       }
