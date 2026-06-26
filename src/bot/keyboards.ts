@@ -124,6 +124,7 @@ export const adminUserActionKeyboard = (userId: number, isBlocked: boolean): Inl
         callback_data: isBlocked ? `user:unblock:${userId}` : `user:block:${userId}`,
       },
     ],
+    [{ text: "🔙 بازگشت به مدیریت کاربران", callback_data: "nav:admin_user_manage" }],
   ],
 });
 
@@ -153,7 +154,14 @@ export const tokenCostKeyboard = (): InlineKeyboardMarkup => ({
 });
 
 export const graceTokenRestoreKeyboard = (tokenCode: string, userId: number): InlineKeyboardMarkup => ({
-  inline_keyboard: [[
-    { text: "🔄 بازگردانی توکن", callback_data: `token:restore:${tokenCode}:${userId}` },
-  ]],
+  inline_keyboard: [
+    [{ text: "🔄 بازگردانی توکن", callback_data: `token:restore:${tokenCode}:${userId}` }],
+    [{ text: "🔙 بازگشت",          callback_data: "nav:admin_grace_tokens" }],
+  ],
+});
+
+export const userBillingKeyboard = (userId: number): InlineKeyboardMarkup => ({
+  inline_keyboard: [
+    [{ text: "🔙 بازگشت به پروفایل کاربر", callback_data: `user:profile:${userId}` }],
+  ],
 });
