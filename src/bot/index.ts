@@ -793,7 +793,7 @@ bot.on("callback_query", async (query) => {
 
 // ── Messages ──────────────────────────────────────────────────────────────────
 bot.on("message", async (msg) => {
-  if (!msg.from || msg.text?.startsWith("/")) return;
+  if (!msg.from || msg.text?.startsWith("/") || msg.contact) return;
 
   try {
     const chatId    = msg.chat.id;
@@ -1117,7 +1117,8 @@ bot.on("contact", async (msg) => {
       return;
     }
     clearAllPending(userId);
-    const phone = (msg.contact!.phone_number ?? "").replace(/[^+\d]/g, "");
+    let phone = (msg.contact!.phone_number ?? "").replace(/[^+\d]/g, "");
+    if (!phone.startsWith("+")) phone = "+" + phone;
     await removeReplyKeyboard(chatId);
     await sendPanel(chatId, TELEGRAM_PHONE_RECEIVED(phone), { parse_mode: "Markdown", reply_markup: cancelKeyboard() });
     const loginResult = await startPhoneLogin(userId, phone);
@@ -1136,3 +1137,4 @@ bot.on("error",         (err) => logger.error({ err }, "bot error"));
 
 logger.info("Telegram bot initialized");
 export default bot;
+
