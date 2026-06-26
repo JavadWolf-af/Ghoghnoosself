@@ -3,30 +3,7 @@ import type {
     ReplyKeyboardMarkup,
   } from "node-telegram-bot-api";
 
-  // ── Reply Keyboard (Main nav — bottom of screen, persistent) ──────────────────
-  // این کیبورد همیشه پایین صفحه نمایانه
-  // ناوبری از طریق editMessageText انجام میشه (نه sendMessage) → کیبورد گوشی نمیاد
-
-  export const mainReplyKeyboard = (): ReplyKeyboardMarkup => ({
-    keyboard: [
-      [{ text: "💎 کیف پول" },         { text: "🔗 دعوت از دوستان" }],
-      [{ text: "👤 پروفایل" },          { text: "🎧 پشتیبانی" }],
-      [{ text: "🎫 تیکت‌های باز" },     { text: "🔑 فعال‌سازی توکن" }],
-    ],
-    resize_keyboard: true,
-    is_persistent: true,
-  });
-
-  export const adminReplyKeyboard = (): ReplyKeyboardMarkup => ({
-    keyboard: [
-      [{ text: "🛠 پنل مدیریت" }],
-      [{ text: "🚪 خروج از ادمین" }],
-    ],
-    resize_keyboard: true,
-    is_persistent: true,
-  });
-
-  // ── Inline Keyboards (Panel content — داخل پیام anchor) ──────────────────────
+  // ── Inline Navigation Keyboards ───────────────────────────────────────────────
 
   export const userMainKeyboard = (): InlineKeyboardMarkup => ({
     inline_keyboard: [
@@ -39,7 +16,7 @@ import type {
   export const walletKeyboard = (): InlineKeyboardMarkup => ({
     inline_keyboard: [
       [{ text: "💳 افزایش موجودی", callback_data: "nav:add_balance" }, { text: "↗️ انتقال اعتبار", callback_data: "nav:transfer" }],
-      [{ text: "🔙 بازگشت", callback_data: "nav:back" }],
+      [{ text: "🔙 بازگشت به منو", callback_data: "nav:back" }],
     ],
   });
 
@@ -61,18 +38,19 @@ import type {
     ],
   });
 
+  // دکمه لغو / بازگشت برای صفحه‌های ورود متن
   export const cancelKeyboard = (): InlineKeyboardMarkup => ({
-    inline_keyboard: [[{ text: "🔙 بازگشت / لغو", callback_data: "nav:back" }]],
+    inline_keyboard: [[{ text: "🔙 لغو / بازگشت", callback_data: "nav:back" }]],
   });
 
-  // ── Reply Keyboard (Blocked users only) ──────────────────────────────────────
+  // ── Reply Keyboard (فقط کاربران مسدودشده) ────────────────────────────────────
   export const blockedKeyboard = (): ReplyKeyboardMarkup => ({
     keyboard: [[{ text: "🎧 پشتیبانی" }]],
     resize_keyboard: true,
     is_persistent: true,
   });
 
-  // ── Inline Keyboards (Admin Actions) ─────────────────────────────────────────
+  // ── Inline Keyboards (عملیات ادمین) ──────────────────────────────────────────
 
   export const depositReviewKeyboard = (requestId: string, userId: number): InlineKeyboardMarkup => ({
     inline_keyboard: [
@@ -129,16 +107,4 @@ import type {
       [{ text: "✅ عضو شدم — بررسی کن", url: `https://t.me/${botUsername}?start=checked` }],
     ],
   });
-
-  // Button texts used for reply keyboard matching in message handler
-  export const REPLY_BUTTONS = {
-    WALLET:       "💎 کیف پول",
-    REFERRAL:     "🔗 دعوت از دوستان",
-    PROFILE:      "👤 پروفایل",
-    SUPPORT:      "🎧 پشتیبانی",
-    OPEN_TICKETS: "🎫 تیکت‌های باز",
-    TOKEN:        "🔑 فعال‌سازی توکن",
-    ADMIN_MANAGE: "🛠 پنل مدیریت",
-    ADMIN_EXIT:   "🚪 خروج از ادمین",
-  };
   
