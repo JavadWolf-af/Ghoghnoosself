@@ -142,6 +142,13 @@ export const adminUserActionKeyboard = (userId: number, isBlocked: boolean): Inl
   ],
 });
 
+export const broadcastConfirmKeyboard = (): InlineKeyboardMarkup => ({
+  inline_keyboard: [[
+    { text: "✅ تأیید و ارسال", callback_data: "bcast_confirm" },
+    { text: "❌ لغو", callback_data: "bcast_cancel" },
+  ]],
+});
+
 // ── Inline Keyboard (URL-only) ────────────────────────────────────────────────
 
 export const channelCheckKeyboard = (
