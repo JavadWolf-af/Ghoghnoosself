@@ -18,12 +18,14 @@ export async function initDb(): Promise<void> {
       joined_at       TIMESTAMP NOT NULL DEFAULT NOW()
     );
     CREATE TABLE IF NOT EXISTS tokens (
-      code               VARCHAR(64) PRIMARY KEY,
+      code                VARCHAR(64) PRIMARY KEY,
       created_by_admin_id BIGINT NOT NULL,
-      created_at         TIMESTAMP NOT NULL DEFAULT NOW(),
-      is_used            BOOLEAN NOT NULL DEFAULT FALSE,
-      used_by_user_id    BIGINT,
-      used_at            TIMESTAMP
+      created_at          TIMESTAMP NOT NULL DEFAULT NOW(),
+      is_used             BOOLEAN NOT NULL DEFAULT FALSE,
+      used_by_user_id     BIGINT,
+      used_at             TIMESTAMP,
+      status              VARCHAR(16) NOT NULL DEFAULT 'active',
+      grace_started_at    TIMESTAMP
     );
     CREATE TABLE IF NOT EXISTS balance_requests (
       id              VARCHAR(32) PRIMARY KEY,
@@ -58,18 +60,9 @@ export async function initDb(): Promise<void> {
   `);
 
   /* ── Migrations for existing installations ─────────────────────────────── */
-  await db.execute(sql`
-    ALTER TABLE users
-      ALTER COLUMN balance TYPE BIGINT;
-  `).catch(() => { /* already BIGINT or migration already applied */ });
-
-  await db.execute(sql`
-    ALTER TABLE balance_requests
-      ALTER COLUMN amount TYPE BIGINT;
-  `).catch(() => {});
-
-  await db.execute(sql`
-    ALTER TABLE balance_requests
-      ADD COLUMN IF NOT EXISTS receipt_file_id VARCHAR(256);
-  `).catch(() => {});
+  await db.execute(sql`ALTER TABLE users ALTER COLUMN balance TYPE BIGINT`).catch(() => {});
+  await db.execute(sql`ALTER TABLE balance_requests ALTER COLUMN amount TYPE BIGINT`).catch(() => {});
+  await db.execute(sql`ALTER TABLE balance_requests ADD COLUMN IF NOT EXISTS receipt_file_id VARCHAR(256)`).catch(() => {});
+  await db.execute(sql`ALTER TABLE tokens ADD COLUMN IF NOT EXISTS status VARCHAR(16) NOT NULL DEFAULT 'active'`).catch(() => {});
+  await db.execute(sql`ALTER TABLE tokens ADD COLUMN IF NOT EXISTS grace_started_at TIMESTAMP`).catch(() => {});
 }
