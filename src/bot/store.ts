@@ -8,45 +8,6 @@ function ensureDataDir() {
   if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true });
 }
 
-interface PersistedData {
-  users: Record<number, UserRecord>;
-  tokens: Record<string, TokenRecord>;
-  balanceRequests: Record<string, BalanceRequest>;
-  cardNumber: string;
-}
-
-function loadData(): PersistedData {
-  ensureDataDir();
-  if (!existsSync(DATA_FILE)) return { users: {}, tokens: {}, balanceRequests: {}, cardNumber: "" };
-  try {
-    const raw = JSON.parse(readFileSync(DATA_FILE, "utf8")) as PersistedData;
-    for (const u of Object.values(raw.users ?? {})) {
-      u.joinedAt = new Date(u.joinedAt);
-      if (u.activatedAt) u.activatedAt = new Date(u.activatedAt);
-      if (u.isBlocked === undefined) u.isBlocked = false;
-    }
-    for (const t of Object.values(raw.tokens ?? {})) {
-      t.createdAt = new Date(t.createdAt);
-      if (t.usedAt) t.usedAt = new Date(t.usedAt);
-    }
-    for (const r of Object.values(raw.balanceRequests ?? {})) {
-      r.requestedAt = new Date(r.requestedAt);
-    }
-    return raw;
-  } catch { return { users: {}, tokens: {}, balanceRequests: {}, cardNumber: "" }; }
-}
-
-function saveData() {
-  ensureDataDir();
-  const data: PersistedData = {
-    users: Object.fromEntries(users) as Record<number, UserRecord>,
-    tokens: Object.fromEntries(tokens) as Record<string, TokenRecord>,
-    balanceRequests: Object.fromEntries(balanceRequests) as Record<string, BalanceRequest>,
-    cardNumber,
-  };
-  writeFileSync(DATA_FILE, JSON.stringify(data, null, 2), "utf8");
-}
-
 export interface UserRecord {
   id: number;
   firstName: string;
@@ -79,18 +40,78 @@ export interface BalanceRequest {
   status: "pending" | "approved" | "rejected";
 }
 
+export interface TicketMessage {
+  from: "user" | "admin";
+  text: string;
+  at: Date;
+}
+
+export interface SupportTicket {
+  id: string;
+  userId: number;
+  status: "open" | "closed";
+  createdAt: Date;
+  messages: TicketMessage[];
+}
+
+interface PersistedData {
+  users: Record<number, UserRecord>;
+  tokens: Record<string, TokenRecord>;
+  balanceRequests: Record<string, BalanceRequest>;
+  tickets: Record<string, SupportTicket>;
+  cardNumber: string;
+}
+
+function loadData(): PersistedData {
+  ensureDataDir();
+  if (!existsSync(DATA_FILE)) return { users: {}, tokens: {}, balanceRequests: {}, tickets: {}, cardNumber: "" };
+  try {
+    const raw = JSON.parse(readFileSync(DATA_FILE, "utf8")) as PersistedData;
+    for (const u of Object.values(raw.users ?? {})) {
+      u.joinedAt = new Date(u.joinedAt);
+      if (u.activatedAt) u.activatedAt = new Date(u.activatedAt);
+      if (u.isBlocked === undefined) u.isBlocked = false;
+    }
+    for (const t of Object.values(raw.tokens ?? {})) {
+      t.createdAt = new Date(t.createdAt);
+      if (t.usedAt) t.usedAt = new Date(t.usedAt);
+    }
+    for (const r of Object.values(raw.balanceRequests ?? {})) {
+      r.requestedAt = new Date(r.requestedAt);
+    }
+    for (const tk of Object.values(raw.tickets ?? {})) {
+      tk.createdAt = new Date(tk.createdAt);
+      tk.messages = (tk.messages ?? []).map(m => ({ ...m, at: new Date(m.at) }));
+    }
+    return { ...raw, tickets: raw.tickets ?? {} };
+  } catch { return { users: {}, tokens: {}, balanceRequests: {}, tickets: {}, cardNumber: "" }; }
+}
+
+function saveData() {
+  ensureDataDir();
+  const data: PersistedData = {
+    users: Object.fromEntries(users) as Record<number, UserRecord>,
+    tokens: Object.fromEntries(tokens) as Record<string, TokenRecord>,
+    balanceRequests: Object.fromEntries(balanceRequests) as Record<string, BalanceRequest>,
+    tickets: Object.fromEntries(ticketsMap) as Record<string, SupportTicket>,
+    cardNumber,
+  };
+  writeFileSync(DATA_FILE, JSON.stringify(data, null, 2), "utf8");
+}
+
 const persisted = loadData();
 const users           = new Map<number, UserRecord>(Object.entries(persisted.users).map(([k, v]) => [Number(k), v]));
 const tokens          = new Map<string, TokenRecord>(Object.entries(persisted.tokens));
 const balanceRequests = new Map<string, BalanceRequest>(Object.entries(persisted.balanceRequests));
+const ticketsMap      = new Map<string, SupportTicket>(Object.entries(persisted.tickets ?? {}));
 let cardNumber        = persisted.cardNumber ?? "";
 
 function generateReferralCode(userId: number): string { return `REF${userId}`; }
 
-function generateId(): string {
+function generateShortId(prefix = ""): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   const part  = () => Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
-  return `${part()}${part()}`;
+  return `${prefix}${part()}`;
 }
 
 function generateTokenCode(): string {
@@ -99,6 +120,7 @@ function generateTokenCode(): string {
   return `SALF-${part()}-${part()}`;
 }
 
+// ── Users ─────────────────────────────────────────────────────────────────────
 export function addUser(user: {
   id: number; firstName: string; lastName?: string; username?: string; referredBy?: number;
 }): void {
@@ -158,6 +180,7 @@ export function deductBalance(userId: number, amount: number): boolean {
   u.balance -= amount; saveData(); return true;
 }
 
+// ── Tokens ────────────────────────────────────────────────────────────────────
 export function createToken(adminId: number): string {
   let code = generateTokenCode();
   while (tokens.has(code)) code = generateTokenCode();
@@ -177,9 +200,10 @@ export function validateAndUseToken(code: string, userId: number): { valid: bool
 export function getTokenCount(): number { return tokens.size; }
 export function getUnusedTokenCount(): number { return Array.from(tokens.values()).filter((t) => !t.isUsed).length; }
 
+// ── Balance Requests ──────────────────────────────────────────────────────────
 export function createBalanceRequest(userId: number, amount: number): string {
-  let id = generateId();
-  while (balanceRequests.has(id)) id = generateId();
+  let id = generateShortId();
+  while (balanceRequests.has(id)) id = generateShortId();
   balanceRequests.set(id, { id, userId, amount, requestedAt: new Date(), status: "pending" });
   saveData(); return id;
 }
@@ -207,24 +231,65 @@ export function transferBalance(
   addBalance(toUserId, amount); return { ok: true };
 }
 
+// ── Support Tickets ───────────────────────────────────────────────────────────
+export function createSupportTicket(userId: number, text: string): SupportTicket {
+  let id = generateShortId("TK");
+  while (ticketsMap.has(id)) id = generateShortId("TK");
+  const ticket: SupportTicket = {
+    id, userId, status: "open", createdAt: new Date(),
+    messages: [{ from: "user", text, at: new Date() }],
+  };
+  ticketsMap.set(id, ticket);
+  saveData(); return ticket;
+}
+
+export function getOpenTicketByUser(userId: number): SupportTicket | undefined {
+  return Array.from(ticketsMap.values()).find(t => t.userId === userId && t.status === "open");
+}
+
+export function getSupportTicket(id: string): SupportTicket | undefined {
+  return ticketsMap.get(id);
+}
+
+export function addTicketMessage(ticketId: string, from: "user" | "admin", text: string): boolean {
+  const ticket = ticketsMap.get(ticketId);
+  if (!ticket) return false;
+  ticket.messages.push({ from, text, at: new Date() });
+  saveData(); return true;
+}
+
+export function closeSupportTicket(ticketId: string): boolean {
+  const ticket = ticketsMap.get(ticketId);
+  if (!ticket || ticket.status === "closed") return false;
+  ticket.status = "closed";
+  saveData(); return true;
+}
+
+export function getOpenTicketsCount(): number {
+  return Array.from(ticketsMap.values()).filter(t => t.status === "open").length;
+}
+
+// ── Card Number ───────────────────────────────────────────────────────────────
 export function setCardNumber(card: string): void { cardNumber = card; saveData(); }
 export function getCardNumber(): string { return cardNumber; }
 
+// ── Pending States ────────────────────────────────────────────────────────────
 type PendingSet =
   | "broadcast" | "tokenEntry" | "addBalance" | "transferInput"
   | "cardNumberInput" | "adminTransfer" | "adminAddBalance" | "adminAddBalanceAmount"
-  | "adminMessageUser" | "support" | "blockedSupport";
+  | "adminMessageUser" | "support" | "blockedSupport" | "ticketReply";
 
 const SETS: Record<PendingSet, Set<number>> = {
   broadcast: new Set(), tokenEntry: new Set(), addBalance: new Set(),
   transferInput: new Set(), cardNumberInput: new Set(), adminTransfer: new Set(),
   adminAddBalance: new Set(), adminAddBalanceAmount: new Set(), adminMessageUser: new Set(),
-  support: new Set(), blockedSupport: new Set(),
+  support: new Set(), blockedSupport: new Set(), ticketReply: new Set(),
 };
 
 const addBalanceData     = new Map<number, { amount: number; receiptId: string }>();
 const adminBalanceTarget = new Map<number, number>();
 const adminMessageTarget = new Map<number, number>();
+const adminTicketTarget  = new Map<number, string>(); // adminId -> ticketId
 
 export function setPending(userId: number, state: PendingSet): void {
   clearAllPending(userId); SETS[state].add(userId);
@@ -235,13 +300,10 @@ export function clearAllPending(userId: number): void {
   addBalanceData.delete(userId);
   adminBalanceTarget.delete(userId);
   adminMessageTarget.delete(userId);
+  adminTicketTarget.delete(userId);
 }
 
 export function isPending(userId: number, state: PendingSet): boolean { return SETS[state].has(userId); }
-
-export function isPendingAny(userId: number): boolean {
-  return Object.values(SETS).some(s => s.has(userId));
-}
 
 export function isPendingWallet(userId: number): boolean {
   return SETS["addBalance"].has(userId) || SETS["transferInput"].has(userId);
@@ -253,7 +315,8 @@ export function isPendingAdminManage(userId: number): boolean {
     || SETS["adminTransfer"].has(userId)
     || SETS["adminAddBalance"].has(userId)
     || SETS["adminAddBalanceAmount"].has(userId)
-    || SETS["adminMessageUser"].has(userId);
+    || SETS["adminMessageUser"].has(userId)
+    || SETS["ticketReply"].has(userId);
 }
 
 export function setAddBalanceData(userId: number, amount: number, receiptId: string): void {
@@ -270,3 +333,7 @@ export function setAdminMessageTarget(adminId: number, targetUserId: number): vo
   adminMessageTarget.set(adminId, targetUserId);
 }
 export function getAdminMessageTarget(adminId: number): number | undefined { return adminMessageTarget.get(adminId); }
+export function setAdminTicketTarget(adminId: number, ticketId: string): void {
+  adminTicketTarget.set(adminId, ticketId);
+}
+export function getAdminTicketTarget(adminId: number): string | undefined { return adminTicketTarget.get(adminId); }
