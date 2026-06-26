@@ -18,6 +18,9 @@ export interface UserRecord {
   referredBy?: number;
   referralCode: string;
   referralCount: number;
+  phoneNumber?: string;
+  tgApiId?: number;
+  tgApiHash?: string;
 }
 
 export interface TokenRecord {
@@ -76,6 +79,9 @@ function rowToUser(r: typeof users.$inferSelect): UserRecord {
     balance: r.balance, isBlocked: r.isBlocked,
     referredBy: r.referredBy ?? undefined,
     referralCode: r.referralCode, referralCount: r.referralCount,
+    phoneNumber: r.phoneNumber ?? undefined,
+    tgApiId: r.tgApiId ?? undefined,
+    tgApiHash: r.tgApiHash ?? undefined,
   };
 }
 
@@ -670,4 +676,32 @@ export async function runHourlyBilling(): Promise<BillingResult> {
     }
   }
   return result;
+}
+
+// ── Telegram API Credentials ──────────────────────────────────────────────────
+
+export async function saveUserApiCredentials(
+  userId: number,
+  phoneNumber: string,
+  apiId: number,
+  apiHash: string,
+): Promise<void> {
+  await db.update(users)
+    .set({ phoneNumber, tgApiId: apiId, tgApiHash: apiHash })
+    .where(eq(users.id, userId));
+}
+
+export async function getUserApiCredentials(
+  userId: number,
+): Promise<{ phoneNumber: string | null; tgApiId: number | null; tgApiHash: string | null }> {
+  const [row] = await db.select({
+    phoneNumber: users.phoneNumber,
+    tgApiId:     users.tgApiId,
+    tgApiHash:   users.tgApiHash,
+  }).from(users).where(eq(users.id, userId));
+  return {
+    phoneNumber: row?.phoneNumber ?? null,
+    tgApiId:     row?.tgApiId ?? null,
+    tgApiHash:   row?.tgApiHash ?? null,
+  };
 }

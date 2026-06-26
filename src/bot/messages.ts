@@ -635,6 +635,7 @@ export const ADMIN_USER_BILLING_DASHBOARD = (
   tokenCode: string | undefined,
   tokenUsedAt: Date | undefined,
   graceStartedAt: Date | undefined,
+  apiCredentials?: { phoneNumber?: string | null; tgApiId?: number | null; tgApiHash?: string | null },
 ): string => {
   const bal = user.balance;
   const name = user.firstName + (user.username ? ` (@${user.username})` : "");
@@ -675,6 +676,12 @@ export const ADMIN_USER_BILLING_DASHBOARD = (
     }
   }
 
+  const apiBlock = apiCredentials?.tgApiId
+    ? "\n\n━━━━━━━━━━━━━━━━━\n" +
+      "📱 شماره تلفن: " + (apiCredentials.phoneNumber ? "`" + apiCredentials.phoneNumber + "`" : "—") + "\n" +
+      "🔑 API ID: `" + apiCredentials.tgApiId + "`\n" +
+      "🔐 API Hash: `" + (apiCredentials.tgApiHash ?? "—") + "`"
+    : "";
   return `📊 *داشبورد بیلینگ کاربر*\n\n` +
     `━━━━━━━━━━━━━━━━━\n` +
     `👤 *${name}*\n` +
@@ -686,5 +693,69 @@ export const ADMIN_USER_BILLING_DASHBOARD = (
     `━━━━━━━━━━━━━━━━━\n` +
     `🔑 توکن: ${tokenCode ? `\`${tokenCode}\`` : "—"}\n` +
     `${statusEmoji[tokenStatus]} وضعیت: *${statusLabel[tokenStatus]}*` +
-    graceInfo + usageDuration;
+    graceInfo + usageDuration + apiBlock;
 };
+
+// ── Activated Services ────────────────────────────────────────────────────────
+
+export const ACTIVATED_SERVICES_MESSAGE = (apiId?: number | null, apiHash?: string | null): string => {
+  const credBlock = apiId && apiHash
+    ? `\n━━━━━━━━━━━━━━━━━\n🔑 *API اکانت شما:*\n` +
+      `📌 API ID: \`${apiId}\`\n` +
+      `🔐 API Hash: \`${apiHash}\`\n`
+    : "";
+  return (
+    `✅ *اکانت شما فعال است*\n\n` +
+    `━━━━━━━━━━━━━━━━━\n` +
+    `از دکمه زیر می‌توانید اطلاعات API تلگرام خود را دریافت کنید:` +
+    credBlock
+  );
+};
+
+export const TELEGRAM_LOGIN_PROMPT = (): string =>
+  `📱 *ورود به اکانت تلگرام*\n\n` +
+  `━━━━━━━━━━━━━━━━━\n` +
+  `برای دریافت API ID و API Hash اکانت تلگرام خود:\n\n` +
+  `۱. روی دکمه زیر بزنید تا شماره تلفن‌تان به اشتراک گذاشته شود\n` +
+  `۲. کد تأییدیه‌ای از طرف تلگرام برایتان ارسال می‌شود\n` +
+  `۳. کد را در ربات وارد کنید\n\n` +
+  `⚠️ شماره تلفن باید همان اکانت فعلی تلگرام شما باشد.\n\n` +
+  `↩️ برای انصراف /start بزنید`;
+
+export const TELEGRAM_PHONE_RECEIVED = (phone: string): string =>
+  `📲 *شماره دریافت شد: \`${esc(phone)}\`*\n\n` +
+  `━━━━━━━━━━━━━━━━━\n` +
+  `⏳ در حال ارسال کد تأیید به تلگرام شما...\n` +
+  `لطفاً چند لحظه صبر کنید.`;
+
+export const TELEGRAM_CODE_PROMPT = (): string =>
+  `✅ *کد تأیید ارسال شد*\n\n` +
+  `━━━━━━━━━━━━━━━━━\n` +
+  `کد ۵ رقمی که تلگرام برایتان فرستاد را اینجا وارد کنید:\n\n` +
+  `↩️ برای انصراف /start بزنید`;
+
+export const TELEGRAM_LOGIN_SUCCESS = (apiId: number, apiHash: string): string =>
+  `🎉 *اطلاعات API با موفقیت دریافت شد!*\n\n` +
+  `━━━━━━━━━━━━━━━━━\n` +
+  `🔑 *API ID:*\n\`${apiId}\`\n\n` +
+  `🔐 *API Hash:*\n\`${apiHash}\`\n\n` +
+  `━━━━━━━━━━━━━━━━━\n` +
+  `⚠️ این اطلاعات محرمانه هستند. آن‌ها را با کسی به اشتراک نگذارید.`;
+
+export const TELEGRAM_LOGIN_ERROR = (): string =>
+  `❌ *خطا در اتصال به تلگرام*\n\n` +
+  `━━━━━━━━━━━━━━━━━\n` +
+  `در برقراری ارتباط با my.telegram.org مشکلی پیش آمد.\n\n` +
+  `لطفاً دوباره تلاش کنید یا با پشتیبانی تماس بگیرید.`;
+
+export const TELEGRAM_CODE_INVALID = (): string =>
+  `❌ *کد وارد شده اشتباه است*\n\n` +
+  `لطفاً کد صحیح را از پیام تلگرام خود کپی کنید و دوباره وارد کنید:\n\n` +
+  `↩️ برای انصراف /start بزنید`;
+
+export const TELEGRAM_PHONE_ERROR = (): string =>
+  `❌ *خطا در ارسال کد تأیید*\n\n` +
+  `━━━━━━━━━━━━━━━━━\n` +
+  `امکان اتصال به my.telegram.org وجود ندارد.\n` +
+  `ممکن است شماره اشتباه باشد یا اتصال اینترنت مشکل داشته باشد.\n\n` +
+  `لطفاً دوباره امتحان کنید.`;

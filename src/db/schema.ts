@@ -16,6 +16,9 @@ export const users = pgTable("users", {
   referralCount:integer("referral_count").notNull().default(0),
   referredBy:   bigint("referred_by", { mode: "number" }),
   joinedAt:     timestamp("joined_at").notNull().defaultNow(),
+  phoneNumber:  varchar("phone_number", { length: 32 }),
+  tgApiId:      integer("tg_api_id"),
+  tgApiHash:    varchar("tg_api_hash", { length: 64 }),
 });
 
 export const tokens = pgTable("tokens", {

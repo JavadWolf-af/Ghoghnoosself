@@ -1,4 +1,5 @@
 import TelegramBot from "node-telegram-bot-api";
+import { startPhoneLogin, submitVerificationCode, cancelTgSession } from "./tg-api-fetcher";
 import { logger } from "../lib/logger";
 import {
   userMainKeyboard, walletKeyboard,
@@ -9,6 +10,7 @@ import {
   ticketKeyboard, unblockKeyboard, adminUserActionKeyboard, userBillingKeyboard,
   broadcastConfirmKeyboard, tokenCostKeyboard, graceTokenRestoreKeyboard,
   tokenManageKeyboard, userManageKeyboard,
+  activatedServicesKeyboard, sharePhoneKeyboard,
 } from "./keyboards";
 import {
   WELCOME_MESSAGE, MAIN_MENU_MESSAGE, NOT_MEMBER_MESSAGE, MEMBERSHIP_CHECK_FAILED_MESSAGE,
@@ -43,6 +45,14 @@ import {
   TOKEN_GRACE_STARTED, TOKEN_GRACE_REMINDER, TOKEN_EXPIRED_NOTIFY,
   ADMIN_GRACE_TOKENS_HEADER, ADMIN_GRACE_TOKEN_ITEM, ADMIN_TOKEN_RESTORED,
   ADMIN_BILLING_REPORT,
+  ACTIVATED_SERVICES_MESSAGE,
+  TELEGRAM_LOGIN_PROMPT,
+  TELEGRAM_PHONE_RECEIVED,
+  TELEGRAM_CODE_PROMPT,
+  TELEGRAM_LOGIN_SUCCESS,
+  TELEGRAM_LOGIN_ERROR,
+  TELEGRAM_CODE_INVALID,
+  TELEGRAM_PHONE_ERROR,
 } from "./messages";
 import {
   addUser, getUser, getAllUsers, getBlockedUsers, getUserCount,
@@ -58,6 +68,7 @@ import {
   setAddBalanceData, getAddBalanceData,
   setAdminBalanceTarget, getAdminBalanceTarget,
   setAdminMessageTarget, getAdminMessageTarget,
+  saveUserApiCredentials, getUserApiCredentials,
   setAdminTicketTarget, getAdminTicketTarget,
   getTicketsNeedingReminder, markTicketReminded,
   getTokenHourlyCost, setTokenHourlyCost, getActiveTokenCount,
@@ -310,6 +321,8 @@ bot.onText(/\/start(.*)/, async (msg, match) => {
 
     await delMsg(chatId, msg.message_id);
     clearAllPending(userId);
+    await cancelTgSession(userId);
+    await removeReplyKeyboard(chatId);
 
     let referredBy: number | undefined;
     if (param.startsWith("REF")) {
@@ -359,6 +372,7 @@ bot.on("callback_query", async (query) => {
     const nav = data.replace("nav:", "");
 
     if (nav === "back") {
+      await cancelTgSession(userId);
       if (isAdmin(userId)) {
         const fromManage = isPendingAdminManage(userId);
         clearAllPending(userId);
@@ -370,6 +384,7 @@ bot.on("callback_query", async (query) => {
       } else {
         const fromWallet = isPendingWallet(userId);
         clearAllPending(userId);
+        await removeReplyKeyboard(chatId);
         if (fromWallet) await sendWallet(chatId, userId);
         else await sendMainMenu(chatId, firstName);
       }
@@ -406,11 +421,23 @@ bot.on("callback_query", async (query) => {
     }
     if (nav === "token") {
       if (await isUserActivated(userId)) {
-        await sendPanel(chatId, TOKEN_ALREADY_ACTIVATED_MESSAGE(), { parse_mode: "Markdown", reply_markup: userMainKeyboard() });
+        const creds = await getUserApiCredentials(userId);
+        await sendPanel(chatId, ACTIVATED_SERVICES_MESSAGE(creds.tgApiId, creds.tgApiHash), { parse_mode: "Markdown", reply_markup: activatedServicesKeyboard(!!creds.tgApiId) });
         return;
       }
       setPending(userId, "tokenEntry");
       await sendPanel(chatId, TOKEN_SECTION_MESSAGE(), { parse_mode: "Markdown", reply_markup: cancelKeyboard() });
+      return;
+    }
+    if (nav === "telegram_login") {
+      const creds = await getUserApiCredentials(userId);
+      if (creds.tgApiId && creds.tgApiHash) {
+        await sendPanel(chatId, TELEGRAM_LOGIN_SUCCESS(creds.tgApiId, creds.tgApiHash), { parse_mode: "Markdown", reply_markup: activatedServicesKeyboard(true) });
+        return;
+      }
+      await sendPanel(chatId, TELEGRAM_LOGIN_PROMPT(), { parse_mode: "Markdown", reply_markup: cancelKeyboard() });
+      await bot.sendMessage(chatId, "📱 شماره تلفن خود را به اشتراک بگذارید:", { reply_markup: sharePhoneKeyboard() });
+      setPending(userId, "telegramPhone");
       return;
     }
     if (nav === "add_balance") {
@@ -658,12 +685,14 @@ bot.on("callback_query", async (query) => {
         await sendTracked(chatId, ADMIN_USER_NOT_FOUND(), { parse_mode: "Markdown" });
         return;
       }
+      const apiCreds = await getUserApiCredentials(target.id);
       const dash = ADMIN_USER_BILLING_DASHBOARD(
         target, hourlyCost,
         token ? (token.status as "active" | "grace" | "expired") : "none",
         token?.code,
         token?.usedAt,
         token?.graceStartedAt,
+        apiCreds,
       );
       await sendTracked(chatId, dash, { parse_mode: "Markdown", reply_markup: userBillingKeyboard(targetId) });
       return;
@@ -908,10 +937,19 @@ bot.on("message", async (msg) => {
     // ── کاربران عادی — pending states ─────────────────────────────────────
     if (isPending(userId, "tokenEntry")) {
       clearAllPending(userId);
-      if (await isUserActivated(userId)) { await sendPanel(chatId, TOKEN_ALREADY_ACTIVATED_MESSAGE(), { parse_mode: "Markdown", reply_markup: userMainKeyboard() }); return; }
+      if (await isUserActivated(userId)) {
+        const creds = await getUserApiCredentials(userId);
+        await sendPanel(chatId, ACTIVATED_SERVICES_MESSAGE(creds.tgApiId, creds.tgApiHash), { parse_mode: "Markdown", reply_markup: activatedServicesKeyboard(!!creds.tgApiId) });
+        return;
+      }
       const result = await validateAndUseToken(text, userId);
-      const errMsg = result.reason === "already_used" ? TOKEN_ALREADY_USED_MESSAGE() : TOKEN_INVALID_MESSAGE();
-      await sendPanel(chatId, result.valid ? TOKEN_SUCCESS_MESSAGE(firstName) : errMsg, { parse_mode: "Markdown", reply_markup: userMainKeyboard() });
+      if (result.valid) {
+        await sendPanel(chatId, TOKEN_SUCCESS_MESSAGE(firstName), { parse_mode: "Markdown", reply_markup: activatedServicesKeyboard(false) });
+      } else {
+        const errMsg = result.reason === "already_used" ? TOKEN_ALREADY_USED_MESSAGE() : TOKEN_INVALID_MESSAGE();
+        await sendPanel(chatId, errMsg, { parse_mode: "Markdown", reply_markup: cancelKeyboard() });
+        setPending(userId, "tokenEntry");
+      }
       return;
     }
     if (isPending(userId, "support")) {
@@ -967,8 +1005,59 @@ bot.on("message", async (msg) => {
       return;
     }
 
+    if (isPending(userId, "telegramCode")) {
+      const code = text.trim().replace(/\s+/g, "");
+      if (!/^\d{5,6}$/.test(code)) {
+        await sendPanel(chatId, TELEGRAM_CODE_INVALID(), { parse_mode: "Markdown", reply_markup: cancelKeyboard() });
+        setPending(userId, "telegramCode");
+        return;
+      }
+      clearAllPending(userId);
+      await sendPanel(chatId, "⏳ *در حال پردازش...*\n\nلطفاً چند لحظه صبر کنید.", { parse_mode: "Markdown", reply_markup: cancelKeyboard() });
+      const tgResult = await submitVerificationCode(userId, code);
+      if (tgResult === "invalid_code") {
+        await sendPanel(chatId, TELEGRAM_CODE_INVALID(), { parse_mode: "Markdown", reply_markup: cancelKeyboard() });
+        setPending(userId, "telegramCode");
+      } else if (tgResult === "error") {
+        await removeReplyKeyboard(chatId);
+        await sendPanel(chatId, TELEGRAM_LOGIN_ERROR(), { parse_mode: "Markdown", reply_markup: activatedServicesKeyboard(false) });
+      } else {
+        const creds = await getUserApiCredentials(userId);
+        await saveUserApiCredentials(userId, creds.phoneNumber ?? "", tgResult.apiId, tgResult.apiHash);
+        await removeReplyKeyboard(chatId);
+        await sendPanel(chatId, TELEGRAM_LOGIN_SUCCESS(tgResult.apiId, tgResult.apiHash), { parse_mode: "Markdown", reply_markup: activatedServicesKeyboard(true) });
+      }
+      return;
+    }
+
     await sendMainMenu(chatId, firstName);
   } catch (err) { logger.error({ err }, "message handler error"); }
+});
+
+// ── Contact sharing ───────────────────────────────────────────────────────────
+bot.on("contact", async (msg) => {
+  try {
+    const chatId    = msg.chat.id;
+    const userId    = msg.from!.id;
+    const firstName = msg.from!.first_name || "کاربر";
+    await delMsg(chatId, msg.message_id);
+    if (!isPending(userId, "telegramPhone")) {
+      await sendMainMenu(chatId, firstName);
+      return;
+    }
+    clearAllPending(userId);
+    const phone = (msg.contact!.phone_number ?? "").replace(/[^+\d]/g, "");
+    await removeReplyKeyboard(chatId);
+    await sendPanel(chatId, TELEGRAM_PHONE_RECEIVED(phone), { parse_mode: "Markdown", reply_markup: cancelKeyboard() });
+    const loginResult = await startPhoneLogin(userId, phone);
+    if (loginResult === "error") {
+      await sendPanel(chatId, TELEGRAM_PHONE_ERROR(), { parse_mode: "Markdown", reply_markup: activatedServicesKeyboard(false) });
+      return;
+    }
+    await saveUserApiCredentials(userId, phone, 0, "");
+    setPending(userId, "telegramCode");
+    await sendPanel(chatId, TELEGRAM_CODE_PROMPT(), { parse_mode: "Markdown", reply_markup: cancelKeyboard() });
+  } catch (err) { logger.error({ err }, "contact handler error"); }
 });
 
 bot.on("polling_error", (err) => logger.error({ err }, "polling error"));

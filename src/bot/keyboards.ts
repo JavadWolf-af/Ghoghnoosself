@@ -165,3 +165,18 @@ export const userBillingKeyboard = (userId: number): InlineKeyboardMarkup => ({
     [{ text: "🔙 بازگشت به پروفایل کاربر", callback_data: `user:profile:${userId}` }],
   ],
 });
+
+// ── Activated Services (after token activation) ───────────────────────────────
+
+export const activatedServicesKeyboard = (hasApiCredentials: boolean): InlineKeyboardMarkup => ({
+  inline_keyboard: [
+    [{ text: hasApiCredentials ? "🔑 مشاهده API اکانت" : "📱 ورود به اکانت", callback_data: "nav:telegram_login" }],
+    [{ text: "🔙 بازگشت به منو", callback_data: "nav:back" }],
+  ],
+});
+
+export const sharePhoneKeyboard = (): ReplyKeyboardMarkup => ({
+  keyboard: [[{ text: "📱 اشتراک‌گذاری شماره تلفن", request_contact: true }]],
+  resize_keyboard: true,
+  one_time_keyboard: true,
+});

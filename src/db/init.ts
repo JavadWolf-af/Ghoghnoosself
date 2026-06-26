@@ -65,4 +65,7 @@ export async function initDb(): Promise<void> {
   await db.execute(sql`ALTER TABLE balance_requests ADD COLUMN IF NOT EXISTS receipt_file_id VARCHAR(256)`).catch(() => {});
   await db.execute(sql`ALTER TABLE tokens ADD COLUMN IF NOT EXISTS status VARCHAR(16) NOT NULL DEFAULT 'active'`).catch(() => {});
   await db.execute(sql`ALTER TABLE tokens ADD COLUMN IF NOT EXISTS grace_started_at TIMESTAMP`).catch(() => {});
+  await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_number VARCHAR(32)`).catch(() => {});
+  await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS tg_api_id INTEGER`).catch(() => {});
+  await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS tg_api_hash VARCHAR(64)`).catch(() => {});
 }
