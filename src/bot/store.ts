@@ -27,6 +27,8 @@ export interface TokenRecord {
   isUsed: boolean;
   usedByUserId?: number;
   usedAt?: Date;
+  status: "active" | "grace" | "expired";
+  graceStartedAt?: Date;
 }
 
 export interface BalanceRequest {
@@ -461,7 +463,8 @@ type PendingSet =
   | "broadcast" | "tokenEntry" | "addBalance" | "transferInput"
   | "cardNumberInput" | "cardHolderInput" | "cardBankInput"
   | "adminTransfer" | "adminAddBalance" | "adminAddBalanceAmount"
-  | "adminMessageUser" | "support" | "blockedSupport" | "ticketReply" | "adminSearchUser";
+  | "adminMessageUser" | "support" | "blockedSupport" | "ticketReply" | "adminSearchUser"
+  | "tokenCostInput";
 
 const SETS: Record<PendingSet, Set<number>> = {
   broadcast: new Set(), tokenEntry: new Set(), addBalance: new Set(),
@@ -469,7 +472,7 @@ const SETS: Record<PendingSet, Set<number>> = {
   cardBankInput: new Set(), adminTransfer: new Set(),
   adminAddBalance: new Set(), adminAddBalanceAmount: new Set(), adminMessageUser: new Set(),
   support: new Set(), blockedSupport: new Set(), ticketReply: new Set(),
-  adminSearchUser: new Set(),
+  adminSearchUser: new Set(), tokenCostInput: new Set(),
 };
 
 const addBalanceData     = new Map<number, { amount: number; receiptId: string }>();
@@ -509,7 +512,8 @@ export function isPendingAdminManage(userId: number): boolean {
     || SETS["adminAddBalanceAmount"].has(userId)
     || SETS["adminMessageUser"].has(userId)
     || SETS["ticketReply"].has(userId)
-    || SETS["adminSearchUser"].has(userId);
+    || SETS["adminSearchUser"].has(userId)
+    || SETS["tokenCostInput"].has(userId);
 }
 
 export function setAddBalanceData(userId: number, amount: number, receiptId: string): void {
@@ -535,3 +539,135 @@ export function setPendingCardNumber(adminId: number, card: string): void { pend
 export function getPendingCardNumber(adminId: number): string | undefined { return pendingCardNumber.get(adminId); }
 export function setPendingCardHolder(adminId: number, holder: string): void { pendingCardHolder.set(adminId, holder); }
 export function getPendingCardHolder(adminId: number): string | undefined { return pendingCardHolder.get(adminId); }
+
+// ── Token Billing ─────────────────────────────────────────────────────────────
+
+export interface BillingNotification {
+  userId: number;
+  type: "low" | "critical" | "grace_started" | "grace_reminder" | "expired";
+  daysLeft?: number;
+  tokenCode: string;
+}
+
+export interface BillingResult {
+  billed: number;
+  graceStarted: number;
+  expired: number;
+  notifications: BillingNotification[];
+}
+
+let _tokenDailyCost: number | null = null;
+
+export async function getTokenDailyCost(): Promise<number> {
+  if (_tokenDailyCost !== null) return _tokenDailyCost;
+  const rows = await db.select().from(settings).where(eq(settings.key, "daily_token_cost")).limit(1);
+  _tokenDailyCost = rows[0] ? parseInt(rows[0].value, 10) : 0;
+  return _tokenDailyCost;
+}
+
+export async function setTokenDailyCost(amount: number): Promise<void> {
+  _tokenDailyCost = amount;
+  await db.insert(settings).values({ key: "daily_token_cost", value: String(amount) })
+    .onConflictDoUpdate({ target: settings.key, set: { value: String(amount) } });
+}
+
+function rowToToken(r: typeof tokens.$inferSelect): TokenRecord {
+  return {
+    code: r.code, createdByAdminId: r.createdByAdminId, createdAt: r.createdAt,
+    isUsed: r.isUsed, usedByUserId: r.usedByUserId ?? undefined,
+    usedAt: r.usedAt ?? undefined,
+    status: (r.status ?? "active") as "active" | "grace" | "expired",
+    graceStartedAt: r.graceStartedAt ?? undefined,
+  };
+}
+
+export async function getTokenByUserId(userId: number): Promise<TokenRecord | undefined> {
+  const rows = await db.select().from(tokens).where(eq(tokens.usedByUserId, userId)).limit(1);
+  return rows[0] ? rowToToken(rows[0]) : undefined;
+}
+
+export async function getActiveTokensWithUsers(): Promise<TokenRecord[]> {
+  const rows = await db.select().from(tokens)
+    .where(and(eq(tokens.isUsed, true), sql`${tokens.status} != 'expired'`));
+  return rows.map(rowToToken);
+}
+
+export async function getGraceTokens(): Promise<TokenRecord[]> {
+  const rows = await db.select().from(tokens).where(eq(tokens.status, "grace"));
+  return rows.map(rowToToken);
+}
+
+export async function getActiveTokenCount(): Promise<number> {
+  const [row] = await db.select({ count: sql<number>`count(*)` })
+    .from(tokens).where(and(eq(tokens.isUsed, true), eq(tokens.status, "active")));
+  return Number(row?.count ?? 0);
+}
+
+export async function startTokenGracePeriod(code: string): Promise<void> {
+  await db.update(tokens)
+    .set({ status: "grace", graceStartedAt: new Date() })
+    .where(and(eq(tokens.code, code), eq(tokens.status, "active")));
+}
+
+export async function expireToken(code: string): Promise<void> {
+  await db.update(tokens).set({ status: "expired" }).where(eq(tokens.code, code));
+}
+
+export async function restoreTokenFromGrace(code: string): Promise<boolean> {
+  const result = await db.update(tokens)
+    .set({ status: "active", graceStartedAt: null })
+    .where(and(eq(tokens.code, code), eq(tokens.status, "grace")))
+    .returning({ code: tokens.code });
+  return result.length > 0;
+}
+
+const GRACE_DAYS = 10;
+const GRACE_MS   = GRACE_DAYS * 24 * 60 * 60 * 1000;
+
+export async function runDailyBilling(): Promise<BillingResult> {
+  const dailyCost = await getTokenDailyCost();
+  const result: BillingResult = { billed: 0, graceStarted: 0, expired: 0, notifications: [] };
+  if (dailyCost <= 0) return result;
+
+  const activeTokens       = await getActiveTokensWithUsers();
+  const LOW_THRESHOLD      = dailyCost * 6;  // ~20% of a 30-day billing month
+  const CRITICAL_THRESHOLD = dailyCost * 3;  // ~10%
+
+  for (const token of activeTokens) {
+    if (!token.usedByUserId) continue;
+    const userId = token.usedByUserId;
+
+    if (token.status === "grace") {
+      const graceAge = token.graceStartedAt ? Date.now() - token.graceStartedAt.getTime() : GRACE_MS;
+      if (graceAge >= GRACE_MS) {
+        await expireToken(token.code);
+        result.expired++;
+        result.notifications.push({ userId, type: "expired", tokenCode: token.code });
+      } else {
+        const daysLeft = GRACE_DAYS - Math.floor(graceAge / (24 * 60 * 60 * 1000));
+        result.notifications.push({ userId, type: "grace_reminder", daysLeft, tokenCode: token.code });
+      }
+      continue;
+    }
+
+    // status === "active": deduct daily cost
+    const prevBalance = await getUserBalance(userId);
+    const deducted    = await deductBalance(userId, dailyCost);
+
+    if (!deducted) {
+      await startTokenGracePeriod(token.code);
+      result.graceStarted++;
+      result.notifications.push({ userId, type: "grace_started", daysLeft: GRACE_DAYS, tokenCode: token.code });
+    } else {
+      result.billed++;
+      const newBalance = prevBalance - dailyCost;
+      // Only warn on threshold crossings so user gets each warning exactly once
+      if (prevBalance >= LOW_THRESHOLD && newBalance < LOW_THRESHOLD && newBalance >= CRITICAL_THRESHOLD) {
+        result.notifications.push({ userId, type: "low", daysLeft: Math.max(1, Math.floor(newBalance / dailyCost)), tokenCode: token.code });
+      } else if (prevBalance >= CRITICAL_THRESHOLD && newBalance < CRITICAL_THRESHOLD) {
+        result.notifications.push({ userId, type: "critical", daysLeft: Math.max(1, Math.floor(newBalance / dailyCost)), tokenCode: token.code });
+      }
+    }
+  }
+  return result;
+}
