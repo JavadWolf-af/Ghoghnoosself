@@ -6,7 +6,7 @@ import {
   cancelKeyboard, blockedKeyboard,
   channelCheckKeyboard,
   depositReviewKeyboard, depositReviewWithRestoreKeyboard,
-  ticketKeyboard, unblockKeyboard, adminUserActionKeyboard,
+  ticketKeyboard, unblockKeyboard, adminUserActionKeyboard, userBillingKeyboard,
   broadcastConfirmKeyboard, tokenCostKeyboard, graceTokenRestoreKeyboard,
   tokenManageKeyboard, userManageKeyboard,
 } from "./keyboards";
@@ -637,6 +637,16 @@ bot.on("callback_query", async (query) => {
       await sendPanel(chatId, ADMIN_MSG_PROMPT(), { parse_mode: "Markdown", reply_markup: cancelKeyboard() });
       return;
     }
+    if (data.startsWith("user:profile:")) {
+      const targetId = parseInt(data.replace("user:profile:", ""), 10);
+      const target   = await getUser(targetId);
+      if (!target) {
+        await sendTracked(chatId, ADMIN_USER_NOT_FOUND(), { parse_mode: "Markdown" });
+        return;
+      }
+      await sendTracked(chatId, ADMIN_USER_PROFILE_ADMIN(target), { parse_mode: "Markdown", reply_markup: adminUserActionKeyboard(targetId, target.isBlocked) });
+      return;
+    }
     if (data.startsWith("user:billing:")) {
       const targetId = parseInt(data.replace("user:billing:", ""), 10);
       const [target, hourlyCost, token] = await Promise.all([
@@ -655,7 +665,7 @@ bot.on("callback_query", async (query) => {
         token?.usedAt,
         token?.graceStartedAt,
       );
-      await sendTracked(chatId, dash, { parse_mode: "Markdown", reply_markup: adminUserActionKeyboard(targetId, target.isBlocked) });
+      await sendTracked(chatId, dash, { parse_mode: "Markdown", reply_markup: userBillingKeyboard(targetId) });
       return;
     }
     if (data.startsWith("user:addbal:")) {
