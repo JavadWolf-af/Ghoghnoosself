@@ -765,6 +765,18 @@ export const TELEGRAM_PHONE_ERROR = (): string =>
 
 // ── Clock (ساعت) ──────────────────────────────────────────────────────────────
 
+
+export const TELEGRAM_LOGIN_PHONE_PROMPT = (): string =>
+  "📱 *اتصال حساب تلگرام*\n\n" +
+  "شماره تلفن خود را به فرمت بین‌المللی وارد کنید:\n\n" +
+  "`+989121234567`\n\n" +
+  "⚠️ کد تأییدی به همین شماره در اپ تلگرام ارسال می‌شود.";
+
+export const TELEGRAM_LOGIN_CODE_PROMPT = (): string =>
+  "🔑 *کد تأیید*\n\n" +
+  "کد ارسال‌شده به اپ تلگرامتان را اینجا وارد کنید:\n\n" +
+  "_(اگر کد نیامد چند ثانیه صبر کنید)_";
+
 export const CLOCK_PANEL_MESSAGE = (enabled: boolean): string =>
   `🕐 *ساعت هوشمند*\n\n` +
   `━━━━━━━━━━━━━━━━━\n` +
