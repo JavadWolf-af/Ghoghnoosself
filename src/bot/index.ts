@@ -123,16 +123,20 @@ async function deleteLastPanel(chatId: number): Promise<void> {
   lastPanelMsgs.delete(chatId);
 }
 
-/** ارسال پنل اصلی — پنل قبلی (همه پیام‌های آن) حذف و پیام جدید ردیابی می‌شود */
+/** ارسال پنل اصلی — ابتدا پیام جدید ارسال، سپس پیام قدیم حذف می‌شود
+ *  (ترتیب معکوس از قبل) تا کیبورد هیچ‌وقت چشمک نزند */
 async function sendPanel(
   chatId: number,
   text: string,
   options: TelegramBot.SendMessageOptions
 ): Promise<void> {
-  await deleteLastPanel(chatId);
+  const oldIds = lastPanelMsgs.get(chatId) ?? [];
   try {
     const sent = await bot.sendMessage(chatId, text, options);
     lastPanelMsgs.set(chatId, [sent.message_id]);
+    for (const msgId of oldIds) {
+      try { await bot.deleteMessage(chatId, msgId); } catch { /* ممکن است قبلاً حذف شده باشد */ }
+    }
   } catch (err: unknown) {
     const errMsg = (err as { message?: string })?.message ?? "";
     if (errMsg.includes("Too Many Requests")) {
@@ -141,6 +145,9 @@ async function sendPanel(
       try {
         const sent = await bot.sendMessage(chatId, text, options);
         lastPanelMsgs.set(chatId, [sent.message_id]);
+        for (const msgId of oldIds) {
+          try { await bot.deleteMessage(chatId, msgId); } catch { /* ignore */ }
+        }
       } catch { /* ignore */ }
     } else if (!errMsg.includes("blocked") && !errMsg.includes("deactivated") && !errMsg.includes("chat not found")) {
       logger.error({ err, chatId }, "sendPanel error");
