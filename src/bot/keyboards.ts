@@ -116,6 +116,9 @@ export const adminUserActionKeyboard = (userId: number, isBlocked: boolean): Inl
       { text: "💬 پیام به کاربر", callback_data: `user:msg:${userId}` },
     ],
     [
+      { text: "📊 داشبورد بیلینگ", callback_data: `user:billing:${userId}` },
+    ],
+    [
       {
         text: isBlocked ? "🔓 رفع مسدودیت" : "⛔️ مسدود کردن",
         callback_data: isBlocked ? `user:unblock:${userId}` : `user:block:${userId}`,
