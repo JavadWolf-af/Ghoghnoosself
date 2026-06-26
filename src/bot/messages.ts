@@ -379,6 +379,108 @@ export const ADMIN_TRANSFER_SUCCESS = (from: number, to: number, amount: number)
   `✅ *انتقال موفق*\n\n` +
   `*${amount.toLocaleString("fa-IR")} تومان* از \`${from}\` به \`${to}\` منتقل شد.`;
 
+// ── Admin Search User ─────────────────────────────────────────────────────────
+
+export const ADMIN_SEARCH_USER_PROMPT = (): string =>
+  `🔍 *جستجوی کاربر*\n\n` +
+  `━━━━━━━━━━━━━━━━━\n` +
+  `آیدی عددی یا یوزرنیم کاربر را وارد کنید:\n\n` +
+  `مثال: \`123456789\` یا \`@username\`\n\n` +
+  `↩️ برای انصراف 🔙 را بزنید`;
+
+export const ADMIN_SEARCH_USER_NOT_FOUND = (): string =>
+  `❌ *کاربر یافت نشد*\n\nکاربری با این آیدی یا یوزرنیم ثبت‌نام نکرده است.`;
+
+export const ADMIN_USER_PROFILE_ADMIN = (user: {
+  id: number;
+  firstName: string;
+  lastName?: string;
+  username?: string;
+  joinedAt: Date;
+  isActivated: boolean;
+  isBlocked: boolean;
+  balance: number;
+  referralCount: number;
+}): string =>
+  `👤 *پروفایل کاربر*\n\n` +
+  `━━━━━━━━━━━━━━━━━\n` +
+  `🆔 آیدی: \`${user.id}\`\n` +
+  `📛 نام: *${esc(user.firstName)}${user.lastName ? " " + esc(user.lastName) : ""}*\n` +
+  (user.username ? `🔖 یوزرنیم: @${esc(user.username)}\n` : "") +
+  `📅 عضویت: ${user.joinedAt.toLocaleDateString("fa-IR")}\n` +
+  `━━━━━━━━━━━━━━━━━\n` +
+  `💎 موجودی: *${user.balance.toLocaleString("fa-IR")} تومان*\n` +
+  `👥 زیرمجموعه: *${user.referralCount}* نفر\n` +
+  `🔑 وضعیت: ${user.isActivated ? "✅ فعال" : "⏳ غیرفعال"}\n` +
+  `🔒 مسدود: ${user.isBlocked ? "⛔️ بله" : "✅ خیر"}`;
+
+// ── Open Tickets View ─────────────────────────────────────────────────────────
+
+export const USER_NO_OPEN_TICKET = (): string =>
+  `✅ *تیکت باز ندارید*\n\n` +
+  `در حال حاضر هیچ تیکت فعالی ندارید.\n` +
+  `برای تماس با پشتیبانی از دکمه 🎧 استفاده کنید.`;
+
+export const USER_OPEN_TICKET = (
+  ticketId: string,
+  createdAt: Date,
+  messages: Array<{ from: "user" | "admin"; text: string; at: Date }>
+): string => {
+  const SHOW_LAST = 5;
+  const shown  = messages.slice(-SHOW_LAST);
+  const omitted = messages.length - shown.length;
+
+  const msgLines = shown.map(m => {
+    const who = m.from === "user" ? "👤 *شما*" : "🔧 *پشتیبانی*";
+    return `${who}:\n${esc(m.text)}`;
+  }).join("\n\n");
+
+  const prefix = omitted > 0
+    ? `_... ${omitted} پیام قدیمی‌تر ..._\n\n━━━━━━━━━━━━━━━━━\n\n`
+    : "";
+
+  return (
+    `🎫 *تیکت باز شما*\n\n` +
+    `━━━━━━━━━━━━━━━━━\n` +
+    `🆔 شماره: \`${ticketId}\`\n` +
+    `📅 تاریخ: ${createdAt.toLocaleDateString("fa-IR")}\n` +
+    `💬 تعداد پیام: *${messages.length}*\n\n` +
+    `━━━━━━━━━━━━━━━━━\n\n` +
+    prefix + msgLines +
+    `\n\n━━━━━━━━━━━━━━━━━\n` +
+    `برای ارسال پیام جدید از 🎧 *پشتیبانی* استفاده کنید.`
+  );
+};
+
+export const ADMIN_OPEN_TICKETS_HEADER = (count: number): string =>
+  count === 0
+    ? `✅ *هیچ تیکت بازی وجود ندارد*\n\nالان همه چیز آروم‌ه 🙂`
+    : `🎫 *تیکت‌های باز* — ${count} عدد\n\n` +
+      `━━━━━━━━━━━━━━━━━\n` +
+      `به ترتیب قدیمی‌ترین نمایش داده می‌شوند:\n` +
+      `🔴 = آخرین پیام از کاربر (نیاز به پاسخ)`;
+
+export const ADMIN_OPEN_TICKET_ITEM = (
+  ticketId: string,
+  userId: number,
+  firstName: string,
+  username: string | undefined,
+  createdAt: Date,
+  messageCount: number,
+  lastFrom: "user" | "admin",
+  lastText: string,
+): string => {
+  const indicator = lastFrom === "user" ? " 🔴" : " 🟢";
+  const lastBy    = lastFrom === "user" ? "👤 کاربر" : "🔧 ادمین";
+  const preview   = esc(lastText).slice(0, 100) + (lastText.length > 100 ? "…" : "");
+  return (
+    `🎫 \`${ticketId}\`${indicator}\n` +
+    `👤 *${esc(firstName)}*${username ? ` (@${esc(username)})` : ""} — \`${userId}\`\n` +
+    `📅 ${createdAt.toLocaleDateString("fa-IR")} · ${messageCount} پیام\n\n` +
+    `${lastBy}: _${preview}_`
+  );
+};
+
 // ── Ticket Reminder ───────────────────────────────────────────────────────────
 
 export const ADMIN_TICKET_REMINDER = (
