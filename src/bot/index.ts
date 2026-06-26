@@ -59,8 +59,8 @@ import {
   setAdminMessageTarget, getAdminMessageTarget,
   setAdminTicketTarget, getAdminTicketTarget,
   getTicketsNeedingReminder, markTicketReminded,
-  getTokenDailyCost, setTokenDailyCost, getActiveTokenCount,
-  getGraceTokens, getTokenByUserId, restoreTokenFromGrace, runDailyBilling,
+  getTokenHourlyCost, setTokenHourlyCost, getActiveTokenCount,
+  getGraceTokens, getTokenByUserId, restoreTokenFromGrace, runHourlyBilling,
 } from "./store";
 
 const BOT_TOKEN           = process.env["TELEGRAM_BOT_TOKEN"];
@@ -125,7 +125,7 @@ setTimeout(() => {
 // ── صورتحساب روزانه توکن ──────────────────────────────────────────────────────
 async function runBilling(): Promise<void> {
   try {
-    const result = await runDailyBilling();
+    const result = await runHourlyBilling();
     for (const n of result.notifications) {
       let msg = '';
       if (n.type === 'low')            msg = BALANCE_LOW_WARNING(n.daysLeft ?? 6);
@@ -141,16 +141,18 @@ async function runBilling(): Promise<void> {
         await safeSend(() => bot.sendMessage(adminId, ADMIN_BILLING_REPORT(result.billed, result.graceStarted, result.expired), { parse_mode: 'Markdown' }), 'billingReport:' + adminId);
       }
     }
-    logger.info({ ...result }, 'Daily billing complete');
-  } catch (err) { logger.error({ err }, 'Daily billing error'); }
+    logger.info({ ...result }, 'Hourly billing complete');
+  } catch (err) { logger.error({ err }, 'Hourly billing error'); }
 }
 
-function scheduleDaily(fn: () => void, hour = 0, minute = 0): void {
-  const now  = new Date();
-  const next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, hour, minute, 0, 0);
-  setTimeout(() => { fn(); setInterval(fn, 24 * 60 * 60 * 1000); }, next.getTime() - now.getTime());
+// Hourly billing — runs at the top of every hour
+function scheduleHourly(fn: () => void): void {
+  const now        = new Date();
+  const nextHour   = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours() + 1, 0, 0, 0);
+  const msToNext   = nextHour.getTime() - now.getTime();
+  setTimeout(() => { fn(); setInterval(fn, 60 * 60 * 1000); }, msToNext);
 }
-scheduleDaily(() => { runBilling().catch((err) => logger.error({ err }, 'Billing scheduler error')); }, 1, 0);
+scheduleHourly(() => { runBilling().catch((err) => logger.error({ err }, 'Hourly billing scheduler error')); });
 
 // ── Panel message tracking ────────────────────────────────────────────────────
 const panelMsgs = new Map<number, number[]>();
@@ -484,12 +486,11 @@ bot.on("callback_query", async (query) => {
         return;
       }
       if (nav === "admin_token_cost") {
-        const [daily, activeCount, graceCount] = await Promise.all([
-          getTokenDailyCost(), getActiveTokenCount(),
+        const [hourly, activeCount, graceCount] = await Promise.all([
+          getTokenHourlyCost(), getActiveTokenCount(),
           getGraceTokens().then(t => t.length),
         ]);
-        const monthly = daily * 30;
-        await sendPanel(chatId, ADMIN_TOKEN_COST_MESSAGE(daily, monthly, activeCount, graceCount), { parse_mode: "Markdown", reply_markup: tokenCostKeyboard() });
+        await sendPanel(chatId, ADMIN_TOKEN_COST_MESSAGE(hourly, activeCount, graceCount), { parse_mode: "Markdown", reply_markup: tokenCostKeyboard() });
         return;
       }
       if (nav === "admin_set_token_cost") {
@@ -795,9 +796,9 @@ bot.on("message", async (msg) => {
           await sendTracked(chatId, "❌ مبلغ نامعتبر است. یک عدد صحیح وارد کنید.", { parse_mode: "Markdown" });
           return;
         }
-        await setTokenDailyCost(amount);
+        await setTokenHourlyCost(amount);
         await sendAdminManage(chatId);
-        await sendTracked(chatId, TOKEN_COST_SET(amount, amount * 30), { parse_mode: "Markdown" });
+        await sendTracked(chatId, TOKEN_COST_SET(amount), { parse_mode: "Markdown" });
         return;
       }
       if (isPending(userId, "adminAddBalanceAmount")) {
