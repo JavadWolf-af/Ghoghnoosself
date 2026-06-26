@@ -13,7 +13,7 @@ export const NOT_MEMBER_MESSAGE = (): string =>
 export const MEMBERSHIP_CHECK_FAILED_MESSAGE = (): string =>
   `⚠️ *خطا در بررسی عضویت*\n\n` +
   `در حال حاضر امکان بررسی عضویت وجود ندارد.\n` +
-  `لطفاً چند دقیقه صبر کنید و دوباره تلاش کنید.`;
+  `لطفاً چند دقیقه صبر کنید و دوباره /start را بزنید.`;
 
 export const ADMIN_PANEL_MESSAGE = (): string =>
   `🔐 *پنل مدیریت*\n\nخوش آمدید به پنل ادمین.\nبرای دسترسی به امکانات، وارد مدیریت منو شوید:`;
@@ -21,30 +21,77 @@ export const ADMIN_PANEL_MESSAGE = (): string =>
 export const ADMIN_MANAGE_MESSAGE = (): string =>
   `📋 *مدیریت منو*\n\nیک گزینه را انتخاب کنید:`;
 
+// ── Support / Ticket ──────────────────────────────────────────────────────────
+
 export const SUPPORT_PROMPT = (): string =>
-  `📞 *پشتیبانی*\n\nپیام خود را بنویسید تا برای پشتیبانی ارسال شود.\n\nبرای انصراف 🔙 را بزنید.`;
+  `📞 *پشتیبانی*\n\nپیام خود را بنویسید.\nیک تیکت برای شما ثبت و در اسرع وقت پاسخ داده می‌شود 🙏\n\nبرای انصراف 🔙 را بزنید.`;
 
-export const SUPPORT_SENT = (): string =>
-  `✅ *پیام شما ارسال شد*\n\nپیامتان به پشتیبانی رسید. در اسرع وقت پاسخ می‌گیرید. 🙏`;
+export const TICKET_CREATED_USER = (ticketId: string): string =>
+  `✅ *تیکت شما ثبت شد*\n\n` +
+  `🎫 شماره تیکت: \`${ticketId}\`\n\n` +
+  `پیام شما دریافت شد. پشتیبانی در اسرع وقت پاسخ می‌دهد. 🙏`;
 
-export const ADMIN_SUPPORT_MESSAGE = (
-  userId: number, firstName: string, username: string | undefined, text: string
+export const TICKET_REPLY_USER = (ticketId: string, replyText: string): string =>
+  `📨 *پاسخ پشتیبانی*\n\n` +
+  `🎫 تیکت: \`${ticketId}\`\n\n` +
+  `${replyText}`;
+
+export const TICKET_CLOSED_USER = (ticketId: string): string =>
+  `🔒 *تیکت بسته شد*\n\n` +
+  `🎫 شماره تیکت: \`${ticketId}\`\n\n` +
+  `تیکت شما توسط پشتیبانی بسته شد.\nاگر مشکل برطرف نشده، دوباره با پشتیبانی تماس بگیرید.`;
+
+export const TICKET_ADDED_USER = (ticketId: string): string =>
+  `✅ *پیام شما اضافه شد*\n\n` +
+  `🎫 تیکت: \`${ticketId}\`\n\n` +
+  `پیام شما به تیکت موجود اضافه شد. منتظر پاسخ باشید. 🙏`;
+
+export const ADMIN_NEW_TICKET = (
+  ticketId: string, userId: number, firstName: string,
+  username: string | undefined, text: string
 ): string =>
-  `📞 *پیام پشتیبانی*\n\n` +
+  `🎫 *تیکت پشتیبانی جدید*\n\n` +
+  `🆔 شماره: \`${ticketId}\`\n` +
   `👤 کاربر: *${firstName}*${username ? ` (@${username})` : ""}\n` +
   `🔢 آیدی: \`${userId}\`\n\n` +
   `💬 پیام:\n${text}`;
 
+export const ADMIN_TICKET_FOLLOWUP = (
+  ticketId: string, userId: number, firstName: string,
+  username: string | undefined, text: string
+): string =>
+  `📩 *پیام جدید در تیکت*\n\n` +
+  `🆔 شماره: \`${ticketId}\`\n` +
+  `👤 کاربر: *${firstName}*${username ? ` (@${username})` : ""}\n` +
+  `🔢 آیدی: \`${userId}\`\n\n` +
+  `💬 پیام:\n${text}`;
+
+export const ADMIN_TICKET_REPLY_PROMPT = (ticketId: string): string =>
+  `✏️ *پاسخ به تیکت \`${ticketId}\`*\n\nپیام پاسخ را بنویسید:\n\nبرای انصراف 🔙 را بزنید.`;
+
+export const ADMIN_TICKET_REPLY_SENT = (ticketId: string): string =>
+  `✅ پاسخ به تیکت \`${ticketId}\` ارسال شد.`;
+
+export const ADMIN_TICKET_CLOSED = (ticketId: string): string =>
+  `🔒 تیکت \`${ticketId}\` بسته شد.`;
+
+export const ADMIN_TICKET_ALREADY_CLOSED = (ticketId: string): string =>
+  `⚠️ تیکت \`${ticketId}\` قبلاً بسته شده است.`;
+
+// ── Blocked user support ──────────────────────────────────────────────────────
+
 export const BLOCKED_SUPPORT_PROMPT = (): string =>
   `📞 *پشتیبانی*\n\n` +
   `حساب شما مسدود شده است.\n` +
-  `پیام خود را بنویسید تا به پشتیبانی ارسال شود:`;
+  `پیام خود را بنویسید تا به پشتیبانی ارسال شود:\n\nبرای انصراف 🔙 را بزنید.`;
 
 export const BLOCKED_SUPPORT_SENT = (): string =>
   `📨 *پیام شما ارسال شد*\n\nپیام شما به پشتیبانی ارسال شد.\nمنتظر پاسخ باشید. 🙏`;
 
 export const BLOCKED_ONLY_SUPPORT = (): string =>
   `🚫 *دسترسی محدود*\n\nحساب شما مسدود است.\nفقط می‌توانید با پشتیبانی تماس بگیرید.`;
+
+// ── Token ─────────────────────────────────────────────────────────────────────
 
 export const TOKEN_SECTION_MESSAGE = (): string =>
   `⭐ *افزودن توکن*\n\n` +
@@ -65,6 +112,8 @@ export const TOKEN_ALREADY_USED_MESSAGE = (): string =>
 
 export const TOKEN_CREATED_MESSAGE = (code: string): string =>
   `🔑 *توکن جدید ساخته شد*\n\n\`${code}\`\n\n⚠️ هر توکن فقط یک بار قابل استفاده است.`;
+
+// ── Wallet ────────────────────────────────────────────────────────────────────
 
 export const WALLET_MESSAGE = (balance: number): string =>
   `💰 *کیف پول*\n\nموجودی: *${balance.toLocaleString("fa-IR")} تومان*\n\nیک گزینه را انتخاب کنید:`;
@@ -91,6 +140,8 @@ export const BALANCE_APPROVED_USER = (amount: number, newBalance: number): strin
 export const BALANCE_REJECTED_USER = (): string =>
   `❌ *درخواست رد شد*\n\nرسید ارسالی مورد تأیید قرار نگرفت.\nدر صورت مشکل با پشتیبانی تماس بگیرید. 📞`;
 
+// ── Block / Unblock ───────────────────────────────────────────────────────────
+
 export const BLOCKED_MESSAGE = (): string =>
   `🚫 *حساب شما مسدود شد*\n\n` +
   `شما خلاف قوانین رفتار کردید و مسدود شدید.\n\n` +
@@ -98,6 +149,8 @@ export const BLOCKED_MESSAGE = (): string =>
 
 export const UNBLOCKED_MESSAGE = (): string =>
   `✅ *حساب شما آزاد شد*\n\nمحدودیت حساب شما برداشته شده است.\nمی‌توانید مجدداً از تمام خدمات استفاده کنید.`;
+
+// ── Transfer ──────────────────────────────────────────────────────────────────
 
 export const TRANSFER_PROMPT = (): string =>
   `💸 *انتقال اعتبار*\n\nشناسه کاربر مقصد و مبلغ را وارد کنید:\n\`[شناسه کاربر] [مبلغ]\`\n\nبرای انصراف 🔙 را بزنید.`;
@@ -111,6 +164,8 @@ export const TRANSFER_FAILED = (reason: string): string => ({
   invalid_format:       "❌ فرمت نادرست.\nشناسه کاربر و مبلغ را جداگانه وارد کنید.",
   invalid_amount:       "❌ مبلغ باید عدد مثبت باشد.",
 }[reason] ?? "❌ خطا در انتقال. دوباره امتحان کنید.");
+
+// ── Profile / Referral ────────────────────────────────────────────────────────
 
 export const REFERRAL_MESSAGE = (user: UserRecord, botUsername: string): string =>
   `👥 *زیر مجموعه گیری*\n\n` +
@@ -126,8 +181,14 @@ export const PROFILE_MESSAGE = (user: UserRecord): string =>
   `💰 موجودی: *${user.balance.toLocaleString("fa-IR")} تومان*\n` +
   `👥 زیرمجموعه: *${user.referralCount}* نفر`;
 
-export const STATS_MESSAGE = (users: number, tokens: number, unused: number): string =>
-  `📊 *آمار ربات*\n\n👥 کاربران: *${users}* نفر\n🔑 توکن صادر شده: *${tokens}*\n✅ توکن باقی‌مانده: *${unused}*`;
+// ── Admin panel ───────────────────────────────────────────────────────────────
+
+export const STATS_MESSAGE = (users: number, tokens: number, unused: number, openTickets: number): string =>
+  `📊 *آمار ربات*\n\n` +
+  `👥 کاربران: *${users}* نفر\n` +
+  `🔑 توکن صادر شده: *${tokens}*\n` +
+  `✅ توکن باقی‌مانده: *${unused}*\n` +
+  `🎫 تیکت‌های باز: *${openTickets}*`;
 
 export const BROADCAST_PROMPT = (): string =>
   `📢 *ارسال پیام همگانی*\n\nپیام را ارسال کنید:\n\nبرای انصراف 🔙 را بزنید.`;
