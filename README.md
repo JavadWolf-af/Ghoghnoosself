@@ -1,273 +1,127 @@
-# 🤖 Ghoghnoosself — ربات تلگرام سلف‌سرویس
+# Ghoghnoosself — ربات تلگرام سلف‌سرویس
 
-ربات تلگرام سلف‌سرویس فارسی با سیستم کیف پول، زیرمجموعه‌گیری، پروفایل و پنل مدیریت حرفه‌ای.  
-پایگاه داده **PostgreSQL** — مقیاس‌پذیر تا صدها هزار کاربر.
-
----
-
-## ✨ امکانات
-
-### کاربران
-- 💰 **کیف پول** — موجودی، افزایش موجودی، انتقال اعتبار
-- 👥 **زیر مجموعه گیری** — لینک دعوت اختصاصی، آمار زیرمجموعه
-- 👤 **پروفایل** — اطلاعات حساب، موجودی، آمار
-- 📞 **پشتیبانی (تیکت)** — سیستم تیکت با یادآور خودکار
-- ⭐ **توکن** — فعال‌سازی امکانات حرفه‌ای
-- ✅ بررسی خودکار عضویت در کانال
-- 🔗 سیستم معرفی با لینک اختصاصی
-
-### مدیران
-- 📊 آمار کاربران و توکن‌ها
-- 📢 ارسال پیام همگانی
-- ➕ صدور توکن جدید
-- 💳 تنظیم شماره کارت بانکی
-- ✅ تأیید یا رد درخواست‌های افزایش موجودی
-- 💸 انتقال اعتبار بین کاربران
-- 🔍 جستجوی کاربر با آیدی یا یوزرنیم
-- 🎫 مدیریت تیکت‌های پشتیبانی
+ربات تلگرامی برای مدیریت خودکار یوزربات‌ها — هر کاربر با شماره خودش وارد می‌شه، ربات api_id و api_hash رو از my.telegram.org می‌گیره و ساعت رو روی اکانت خودش تنظیم می‌کنه.
 
 ---
 
-## ⚡ نصب یک‌خطی
+## نصب سریع (روی سرور جدید)
 
 ```bash
-cd && curl -fsSL https://raw.githubusercontent.com/JavadWolf-af/Ghoghnoosself/main/install.sh | bash
+bash <(curl -fsSL https://raw.githubusercontent.com/JavadWolf-af/Ghoghnoosself/main/install.sh)
 ```
 
-> اگر از داخل پوشه Ghoghnoosself اجرا می‌کنید حتماً ابتدا `cd` بزنید.
-
-اسکریپت به‌صورت خودکار همه موارد را نصب و تنظیم می‌کند:
-- Git، Node.js 18+، PostgreSQL
-- دیتابیس و کاربر PostgreSQL (با رمز تصادفی)
-- Build ربات
-- سرویس systemd یا pm2
-- دستورات مدیریت (`update`، `backup`، `import`، `uninstall`)
+اسکریپت نصب خودکار انجام می‌دهد:
+- تست دسترسی به `my.telegram.org` قبل از شروع
+- نصب Node.js 20+، PostgreSQL، Chromium و همه وابستگی‌ها
+- ساخت دیتابیس و فایل `.env`
+- تست Puppeteer برای اطمینان از دسترسی به سایت تلگرام
+- راه‌اندازی سرویس systemd یا pm2
 
 ---
 
-## 🛠 پیش‌نیازها
-
-اسکریپت نصب به‌طور خودکار همه موارد را نصب می‌کند:
-
-| پیش‌نیاز | نسخه |
-|---|---|
-| Git | هر نسخه |
-| Node.js | 18 یا بالاتر |
-| PostgreSQL | 14 یا بالاتر |
-
----
-
-## ⚙️ تنظیمات (.env)
-
-| متغیر | توضیح | مثال |
-|---|---|---|
-| `TELEGRAM_BOT_TOKEN` | توکن ربات از @BotFather | `123456:ABCdef...` |
-| `CHANNEL_USERNAME` | یوزرنیم کانال | `@MyChannel` |
-| `CHANNEL_URL` | لینک کانال | `https://t.me/MyChannel` |
-| `ADMIN_IDS` | شناسه عددی ادمین‌ها (با کاما) | `123456789,987654321` |
-| `DATABASE_URL` | آدرس اتصال PostgreSQL | `postgresql://user:pass@localhost:5432/db` |
-| `LOG_LEVEL` | سطح لاگ | `info` |
-| `NODE_ENV` | محیط اجرا | `production` |
-
----
-
-## 🗄️ پایگاه داده
-
-پروژه از **PostgreSQL + Drizzle ORM** استفاده می‌کند.
-
-- جداول به‌صورت خودکار در **اولین اجرا** ساخته می‌شوند
-- نیاز به اجرای دستی migration نیست
-- اتصال به DB از طریق متغیر `DATABASE_URL`
-
-### اتصال مستقیم به دیتابیس
-
-```bash
-psql -U ghoghnoosself -d ghoghnoosself
-```
-
----
-
-## 🔄 آپدیت
+## آپدیت
 
 ```bash
 update-ghoghnoosself
 ```
 
-اسکریپت آپدیت به‌طور خودکار:
-- آخرین نسخه را از GitHub دریافت می‌کند
-- در صورت نبود PostgreSQL، آن را نصب می‌کند
-- در صورت نبود `DATABASE_URL`، دیتابیس جدید می‌سازد
-- از داده‌های قدیمی JSON بکاپ می‌گیرد
-- وابستگی‌ها را نصب و ربات را build و restart می‌کند
-
 ---
 
-## 📦 بکاپ دیتابیس
-
-```bash
-backup-ghoghnoosself
-```
-
-یک فایل فشرده از تمام داده‌های دیتابیس می‌سازد:
-
-```
-✅ بکاپ با موفقیت گرفته شد
-📦 فایل: ~/ghoghnoosself_backup_20260626_143000.sql.gz
-📏 حجم:  48K
-```
-
-فایل بکاپ شامل:
-- تمام کاربران و موجودی‌ها
-- توکن‌ها و وضعیت فعال‌سازی
-- تاریخچه درخواست‌های افزایش موجودی
-- تیکت‌ها و پیام‌های پشتیبانی
-- تنظیمات ربات (شماره کارت و غیره)
-
----
-
-## 📥 ایمپورت دیتابیس
-
-```bash
-import-ghoghnoosself <نام-فایل-بکاپ>
-```
-
-مثال:
-
-```bash
-import-ghoghnoosself ~/ghoghnoosself_backup_20260626_143000.sql.gz
-```
-
-اسکریپت ایمپورت:
-- سرویس ربات را متوقف می‌کند
-- تمام داده‌های فعلی دیتابیس را با داده‌های بکاپ جایگزین می‌کند
-- سرویس را مجدداً راه‌اندازی می‌کند
-
-> ⚠️ این عملیات داده‌های فعلی دیتابیس را **بازنویسی** می‌کند. قبل از اجرا تأیید می‌خواهد.
-
----
-
-## 🚀 انتقال به سرور جدید
-
-برای جابجایی ربات بین دو سرور بدون از دست رفتن داده:
-
-**مرحله ۱ — سرور قدیمی: بکاپ بگیرید**
-
-```bash
-backup-ghoghnoosself
-```
-
-**مرحله ۲ — انتقال فایل بکاپ به سرور جدید**
-
-```bash
-scp ~/ghoghnoosself_backup_*.sql.gz user@new-server:~/
-```
-
-**مرحله ۳ — سرور جدید: ربات را نصب کنید**
-
-```bash
-cd && curl -fsSL https://raw.githubusercontent.com/JavadWolf-af/Ghoghnoosself/main/install.sh | bash
-```
-
-**مرحله ۴ — سرور جدید: داده‌ها را ایمپورت کنید**
-
-```bash
-import-ghoghnoosself ~/ghoghnoosself_backup_*.sql.gz
-```
-
-پس از اتمام، تمام کاربران، موجودی‌ها، توکن‌ها و تیکت‌ها در سرور جدید موجود هستند.
-
----
-
-## 🗑 حذف کامل
-
-```bash
-uninstall-ghoghnoosself
-```
-
----
-
-## 📋 خلاصه دستورات مدیریت
+## دستورات کمکی
 
 | دستور | توضیح |
 |---|---|
-| `update-ghoghnoosself` | آپدیت به آخرین نسخه |
-| `backup-ghoghnoosself` | بکاپ از تمام داده‌های دیتابیس |
-| `import-ghoghnoosself <file>` | ایمپورت بکاپ (انتقال سرور) |
-| `uninstall-ghoghnoosself` | حذف کامل ربات و سرویس |
+| `update-ghoghnoosself` | آپدیت به آخرین نسخه از GitHub |
+| `uninstall-ghoghnoosself` | حذف کامل ربات |
+| `backup-ghoghnoosself` | بکاپ از دیتابیس |
+| `import-ghoghnoosself <file>` | ایمپورت بکاپ |
 
 ---
 
-## 🗂 ساختار فایل‌ها
-
-```
-Ghoghnoosself/
-├── src/
-│   ├── db/
-│   │   ├── schema.ts     # اسکیمای Drizzle ORM
-│   │   ├── client.ts     # اتصال به PostgreSQL
-│   │   └── init.ts       # ساخت خودکار جداول
-│   ├── bot/
-│   │   ├── index.ts      # منطق اصلی ربات
-│   │   ├── keyboards.ts  # کیبوردها و دکمه‌ها
-│   │   ├── messages.ts   # متن‌های ربات
-│   │   └── store.ts      # لایه دسترسی به داده (PostgreSQL)
-│   ├── lib/
-│   │   └── logger.ts     # سیستم لاگ
-│   └── index.ts          # نقطه ورود
-├── dist/                 # کد کامپایل‌شده
-├── build.mjs             # اسکریپت ساخت
-├── drizzle.config.ts     # تنظیمات Drizzle Kit
-├── install.sh            # نصب خودکار
-├── update.sh             # آپدیت خودکار
-├── backup.sh             # بکاپ دیتابیس
-├── import.sh             # ایمپورت دیتابیس
-├── uninstall.sh          # حذف کامل
-├── .env.example          # نمونه تنظیمات
-└── package.json
-```
-
----
-
-## 📋 دستورات مفید
+## لاگ‌ها
 
 ```bash
-# مشاهده لاگ‌های ربات (systemd)
-journalctl -u ghoghnoosself -f
-
-# وضعیت سرویس
-systemctl status ghoghnoosself
-
-# ری‌استارت
-systemctl restart ghoghnoosself
-
-# اتصال مستقیم به دیتابیس
-psql -U ghoghnoosself -d ghoghnoosself
-
-# مشاهده کاربران
-psql -U ghoghnoosself -d ghoghnoosself -c "SELECT id, first_name, balance FROM users;"
+journalctl -u ghoghnoosself -f          # لاگ زنده
+journalctl -u ghoghnoosself -n 50       # ۵۰ خط آخر
+sudo systemctl status ghoghnoosself     # وضعیت سرویس
 ```
 
 ---
 
-## 📈 ظرفیت
+## فایل `.env`
 
-| تعداد کاربر | وضعیت |
-|---|---|
-| تا ۱۰,۰۰۰ نفر | ✅ بدون نیاز به تنظیم اضافه |
-| ۱۰,۰۰۰ – ۱۰۰,۰۰۰ نفر | ✅ با connection pooling پیش‌فرض |
-| بالاتر از ۱۰۰,۰۰۰ نفر | ✅ با تنظیم `max` در postgres-js |
-
----
-
-## 🔒 امنیت
-
-- هیچ‌گاه فایل `.env` را در GitHub آپلود نکنید
-- توکن ربات را با کسی به اشتراک نگذارید
-- ادمین‌ها فقط با شناسه عددی تلگرام تعریف می‌شوند
-- رمز دیتابیس به‌صورت تصادفی توسط اسکریپت نصب تولید می‌شود
+```env
+TELEGRAM_BOT_TOKEN=   # توکن ربات از @BotFather
+CHANNEL_USERNAME=     # @ChannelUsername
+CHANNEL_URL=          # https://t.me/Channel
+ADMIN_IDS=            # شناسه عددی ادمین‌ها (با کاما جدا)
+DATABASE_URL=         # postgresql://user:pass@localhost:5432/db
+LOG_LEVEL=info
+NODE_ENV=production
+```
 
 ---
 
-## 📄 لایسنس
+## معماری
 
-MIT License — [JavadWolf-af](https://github.com/JavadWolf-af)
+```
+src/
+├── bot/
+│   ├── index.ts           # هندلرهای اصلی ربات
+│   ├── messages.ts        # متن‌های فارسی
+│   ├── keyboards.ts       # کیبوردها
+│   ├── store.ts           # لایه دیتابیس (Drizzle ORM)
+│   ├── tg-api-fetcher.ts  # Puppeteer → my.telegram.org (گرفتن api_id)
+│   └── userbot-manager.ts # GramJS userbot (ساعت روی اکانت کاربر)
+├── db/
+│   ├── schema.ts          # اسکیما PostgreSQL
+│   └── client.ts
+└── index.ts               # نقطه ورود
+```
+
+### فلو اتصال تلگرام کاربر
+
+```
+کاربر: "اتصال تلگرام"
+  ↓
+ربات شماره می‌گیره (contact sharing)
+  ↓
+Puppeteer → my.telegram.org/auth
+  ↓ شماره + کد تأیید
+api_id و api_hash ذخیره میشن
+  ↓
+کاربر می‌تونه ساعت رو روی اکانت خودش فعال کنه
+```
+
+### فلو ساعت (Clock)
+
+```
+کاربر: "فعال‌سازی ساعت"
+  ↓
+GramJS با api_id کاربر → کد به تلگرام کاربر
+  ↓
+کاربر کد وارد می‌کنه → session ذخیره میشه
+  ↓
+هر دقیقه: نام خانوادگی = ساعت ایران (bold unicode)
+```
+
+---
+
+## Stack
+
+- **Runtime**: Node.js 20+, TypeScript
+- **Bot API**: node-telegram-bot-api
+- **MTProto**: GramJS (telegram)
+- **Automation**: Puppeteer (stealth script برای bypass bot detection)
+- **DB**: PostgreSQL + Drizzle ORM
+- **Build**: esbuild (ESM bundle)
+- **Process**: systemd یا pm2
+
+---
+
+## نکات مهم
+
+- سرور باید به `my.telegram.org` دسترسی داشته باشه (فیلتر نباشه)
+- اسکریپت نصب قبل از شروع این دسترسی رو تست می‌کنه
+- Puppeteer از stealth script استفاده می‌کنه تا bot detection دور زده بشه
+- هر کاربر session و api credentials مستقل داره
