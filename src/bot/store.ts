@@ -336,8 +336,10 @@ export async function getAllOpenTickets(): Promise<SupportTicket[]> {
   return Promise.all(rows.map(buildTicket));
 }
 
-// ── Card Number ───────────────────────────────────────────────────────────────
+// ── Card Info ─────────────────────────────────────────────────────────────────
 let _cardNumber: string | null = null;
+let _cardHolder: string | null = null;
+let _cardBank:   string | null = null;
 
 export async function getCardNumber(): Promise<string> {
   if (_cardNumber !== null) return _cardNumber;
@@ -345,11 +347,34 @@ export async function getCardNumber(): Promise<string> {
   _cardNumber = rows[0]?.value ?? "";
   return _cardNumber;
 }
-
 export async function setCardNumber(card: string): Promise<void> {
   _cardNumber = card;
   await db.insert(settings).values({ key: "card_number", value: card })
     .onConflictDoUpdate({ target: settings.key, set: { value: card } });
+}
+
+export async function getCardHolder(): Promise<string> {
+  if (_cardHolder !== null) return _cardHolder;
+  const rows = await db.select().from(settings).where(eq(settings.key, "card_holder")).limit(1);
+  _cardHolder = rows[0]?.value ?? "";
+  return _cardHolder;
+}
+export async function setCardHolder(holder: string): Promise<void> {
+  _cardHolder = holder;
+  await db.insert(settings).values({ key: "card_holder", value: holder })
+    .onConflictDoUpdate({ target: settings.key, set: { value: holder } });
+}
+
+export async function getCardBank(): Promise<string> {
+  if (_cardBank !== null) return _cardBank;
+  const rows = await db.select().from(settings).where(eq(settings.key, "card_bank")).limit(1);
+  _cardBank = rows[0]?.value ?? "";
+  return _cardBank;
+}
+export async function setCardBank(bank: string): Promise<void> {
+  _cardBank = bank;
+  await db.insert(settings).values({ key: "card_bank", value: bank })
+    .onConflictDoUpdate({ target: settings.key, set: { value: bank } });
 }
 
 // ── Ticket Reminders ──────────────────────────────────────────────────────────
@@ -376,12 +401,14 @@ export async function markTicketReminded(ticketId: string): Promise<void> {
 // ── Pending States (in-memory — transient) ────────────────────────────────────
 type PendingSet =
   | "broadcast" | "tokenEntry" | "addBalance" | "transferInput"
-  | "cardNumberInput" | "adminTransfer" | "adminAddBalance" | "adminAddBalanceAmount"
+  | "cardNumberInput" | "cardHolderInput" | "cardBankInput"
+  | "adminTransfer" | "adminAddBalance" | "adminAddBalanceAmount"
   | "adminMessageUser" | "support" | "blockedSupport" | "ticketReply" | "adminSearchUser";
 
 const SETS: Record<PendingSet, Set<number>> = {
   broadcast: new Set(), tokenEntry: new Set(), addBalance: new Set(),
-  transferInput: new Set(), cardNumberInput: new Set(), adminTransfer: new Set(),
+  transferInput: new Set(), cardNumberInput: new Set(), cardHolderInput: new Set(),
+  cardBankInput: new Set(), adminTransfer: new Set(),
   adminAddBalance: new Set(), adminAddBalanceAmount: new Set(), adminMessageUser: new Set(),
   support: new Set(), blockedSupport: new Set(), ticketReply: new Set(),
   adminSearchUser: new Set(),
@@ -391,6 +418,8 @@ const addBalanceData     = new Map<number, { amount: number; receiptId: string }
 const adminBalanceTarget = new Map<number, number>();
 const adminMessageTarget = new Map<number, number>();
 const adminTicketTarget  = new Map<number, string>();
+const pendingCardNumber  = new Map<number, string>();
+const pendingCardHolder  = new Map<number, string>();
 
 export function setPending(userId: number, state: PendingSet): void {
   clearAllPending(userId); SETS[state].add(userId);
@@ -402,6 +431,8 @@ export function clearAllPending(userId: number): void {
   adminBalanceTarget.delete(userId);
   adminMessageTarget.delete(userId);
   adminTicketTarget.delete(userId);
+  pendingCardNumber.delete(userId);
+  pendingCardHolder.delete(userId);
 }
 
 export function isPending(userId: number, state: PendingSet): boolean { return SETS[state].has(userId); }
@@ -413,6 +444,8 @@ export function isPendingWallet(userId: number): boolean {
 export function isPendingAdminManage(userId: number): boolean {
   return SETS["broadcast"].has(userId)
     || SETS["cardNumberInput"].has(userId)
+    || SETS["cardHolderInput"].has(userId)
+    || SETS["cardBankInput"].has(userId)
     || SETS["adminTransfer"].has(userId)
     || SETS["adminAddBalance"].has(userId)
     || SETS["adminAddBalanceAmount"].has(userId)
@@ -439,3 +472,8 @@ export function setAdminTicketTarget(adminId: number, ticketId: string): void {
   adminTicketTarget.set(adminId, ticketId);
 }
 export function getAdminTicketTarget(adminId: number): string | undefined { return adminTicketTarget.get(adminId); }
+
+export function setPendingCardNumber(adminId: number, card: string): void { pendingCardNumber.set(adminId, card); }
+export function getPendingCardNumber(adminId: number): string | undefined { return pendingCardNumber.get(adminId); }
+export function setPendingCardHolder(adminId: number, holder: string): void { pendingCardHolder.set(adminId, holder); }
+export function getPendingCardHolder(adminId: number): string | undefined { return pendingCardHolder.get(adminId); }
