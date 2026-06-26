@@ -540,6 +540,11 @@ const pendingBroadcastText = new Map<number, string>();
       if (data === "bcast_cancel") { pendingBroadcastText.delete(chatId); await sendAdminManage(chatId); return; }
       const broadcastText = pendingBroadcastText.get(chatId) ?? "";
       pendingBroadcastText.delete(chatId);
+      if (!broadcastText.trim()) {
+        await sendAdminManage(chatId);
+        await sendTracked(chatId, "❌ *خطا:* متن پیام گم شده است. لطفاً دوباره امتحان کنید.", { parse_mode: "Markdown" });
+        return;
+      }
       const users = getAllUsers();
       let sent = 0;
       for (const user of users) {
