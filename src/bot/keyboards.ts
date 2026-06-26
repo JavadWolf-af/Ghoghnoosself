@@ -126,3 +126,12 @@ export const depositReviewKeyboard = (requestId: string, userId: number): Inline
 export const unblockKeyboard = (userId: number): InlineKeyboardMarkup => ({
   inline_keyboard: [[{ text: "🔓 آزاد کردن", callback_data: `unblock:${userId}` }]],
 });
+
+export const ticketKeyboard = (ticketId: string): InlineKeyboardMarkup => ({
+  inline_keyboard: [
+    [
+      { text: "✏️ پاسخ به تیکت", callback_data: `tkt_reply:${ticketId}` },
+      { text: "🔒 بستن تیکت",    callback_data: `tkt_close:${ticketId}` },
+    ],
+  ],
+});
