@@ -1,12 +1,9 @@
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
-import { resolve } from "node:path";
-
-const DATA_DIR  = resolve(process.env["DATA_DIR"] ?? "./data");
-const DATA_FILE = resolve(DATA_DIR, "db.json");
-
-function ensureDataDir() {
-  if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true });
-}
+import { eq, and, sql } from "drizzle-orm";
+import { db } from "../db/client";
+import {
+  users, tokens, balanceRequests,
+  supportTickets, ticketMessages, settings,
+} from "../db/schema";
 
 export interface UserRecord {
   id: number;
@@ -55,59 +52,6 @@ export interface SupportTicket {
   lastReminderAt?: Date;
 }
 
-interface PersistedData {
-  users: Record<number, UserRecord>;
-  tokens: Record<string, TokenRecord>;
-  balanceRequests: Record<string, BalanceRequest>;
-  tickets: Record<string, SupportTicket>;
-  cardNumber: string;
-}
-
-function loadData(): PersistedData {
-  ensureDataDir();
-  if (!existsSync(DATA_FILE)) return { users: {}, tokens: {}, balanceRequests: {}, tickets: {}, cardNumber: "" };
-  try {
-    const raw = JSON.parse(readFileSync(DATA_FILE, "utf8")) as PersistedData;
-    for (const u of Object.values(raw.users ?? {})) {
-      u.joinedAt = new Date(u.joinedAt);
-      if (u.activatedAt) u.activatedAt = new Date(u.activatedAt);
-      if (u.isBlocked === undefined) u.isBlocked = false;
-    }
-    for (const t of Object.values(raw.tokens ?? {})) {
-      t.createdAt = new Date(t.createdAt);
-      if (t.usedAt) t.usedAt = new Date(t.usedAt);
-    }
-    for (const r of Object.values(raw.balanceRequests ?? {})) {
-      r.requestedAt = new Date(r.requestedAt);
-    }
-    for (const tk of Object.values(raw.tickets ?? {})) {
-      tk.createdAt = new Date(tk.createdAt);
-      tk.messages = (tk.messages ?? []).map(m => ({ ...m, at: new Date(m.at) }));
-      if (tk.lastReminderAt) tk.lastReminderAt = new Date(tk.lastReminderAt);
-    }
-    return { ...raw, tickets: raw.tickets ?? {} };
-  } catch { return { users: {}, tokens: {}, balanceRequests: {}, tickets: {}, cardNumber: "" }; }
-}
-
-function saveData() {
-  ensureDataDir();
-  const data: PersistedData = {
-    users: Object.fromEntries(users) as Record<number, UserRecord>,
-    tokens: Object.fromEntries(tokens) as Record<string, TokenRecord>,
-    balanceRequests: Object.fromEntries(balanceRequests) as Record<string, BalanceRequest>,
-    tickets: Object.fromEntries(ticketsMap) as Record<string, SupportTicket>,
-    cardNumber,
-  };
-  writeFileSync(DATA_FILE, JSON.stringify(data, null, 2), "utf8");
-}
-
-const persisted = loadData();
-const users           = new Map<number, UserRecord>(Object.entries(persisted.users).map(([k, v]) => [Number(k), v]));
-const tokens          = new Map<string, TokenRecord>(Object.entries(persisted.tokens));
-const balanceRequests = new Map<string, BalanceRequest>(Object.entries(persisted.balanceRequests));
-const ticketsMap      = new Map<string, SupportTicket>(Object.entries(persisted.tickets ?? {}));
-let cardNumber        = persisted.cardNumber ?? "";
-
 function generateReferralCode(userId: number): string { return `REF${userId}`; }
 
 function generateShortId(prefix = ""): string {
@@ -122,169 +66,314 @@ function generateTokenCode(): string {
   return `SALF-${part()}-${part()}`;
 }
 
+function rowToUser(r: typeof users.$inferSelect): UserRecord {
+  return {
+    id: r.id, firstName: r.firstName, lastName: r.lastName ?? undefined,
+    username: r.username ?? undefined, joinedAt: r.joinedAt,
+    isActivated: r.isActivated, activatedAt: r.activatedAt ?? undefined,
+    balance: r.balance, isBlocked: r.isBlocked,
+    referredBy: r.referredBy ?? undefined,
+    referralCode: r.referralCode, referralCount: r.referralCount,
+  };
+}
+
+async function buildTicket(
+  row: typeof supportTickets.$inferSelect,
+): Promise<SupportTicket> {
+  const msgs = await db
+    .select()
+    .from(ticketMessages)
+    .where(eq(ticketMessages.ticketId, row.id))
+    .orderBy(ticketMessages.at);
+  return {
+    id: row.id, userId: row.userId,
+    status: row.status as "open" | "closed",
+    createdAt: row.createdAt,
+    lastReminderAt: row.lastReminderAt ?? undefined,
+    messages: msgs.map(m => ({
+      from: m.fromRole as "user" | "admin",
+      text: m.text, at: m.at,
+    })),
+  };
+}
+
 // ── Users ─────────────────────────────────────────────────────────────────────
-export function addUser(user: {
+export async function addUser(user: {
   id: number; firstName: string; lastName?: string; username?: string; referredBy?: number;
-}): void {
-  if (!users.has(user.id)) {
-    users.set(user.id, {
-      ...user, joinedAt: new Date(), isActivated: false, isBlocked: false,
-      balance: 0, referralCode: generateReferralCode(user.id), referralCount: 0,
+}): Promise<void> {
+  const existing = await db.select().from(users).where(eq(users.id, user.id)).limit(1);
+  if (existing.length === 0) {
+    await db.insert(users).values({
+      id: user.id, firstName: user.firstName,
+      lastName: user.lastName ?? null, username: user.username ?? null,
+      balance: 0, isActivated: false, isBlocked: false,
+      referralCode: generateReferralCode(user.id), referralCount: 0,
+      referredBy: user.referredBy ?? null,
     });
-    if (user.referredBy && users.has(user.referredBy)) {
-      users.get(user.referredBy)!.referralCount += 1;
+    if (user.referredBy) {
+      await db
+        .update(users)
+        .set({ referralCount: sql`${users.referralCount} + 1` })
+        .where(eq(users.id, user.referredBy));
     }
-    saveData();
   } else {
-    const u = users.get(user.id)!;
-    u.firstName = user.firstName;
-    if (user.lastName !== undefined) u.lastName = user.lastName;
-    if (user.username !== undefined) u.username = user.username;
-    saveData();
+    await db
+      .update(users)
+      .set({
+        firstName: user.firstName,
+        lastName: user.lastName ?? null,
+        username: user.username ?? null,
+      })
+      .where(eq(users.id, user.id));
   }
 }
 
-export function getUser(userId: number): UserRecord | undefined { return users.get(userId); }
-export function getAllUsers(): UserRecord[] { return Array.from(users.values()); }
-export function getBlockedUsers(): UserRecord[] { return Array.from(users.values()).filter(u => u.isBlocked); }
-export function getUserCount(): number { return users.size; }
-export function isUserActivated(userId: number): boolean { return users.get(userId)?.isActivated ?? false; }
-export function isUserBlocked(userId: number): boolean { return users.get(userId)?.isBlocked ?? false; }
-
-export function activateUser(userId: number): void {
-  const u = users.get(userId);
-  if (u) { u.isActivated = true; u.activatedAt = new Date(); saveData(); }
+export async function getUser(userId: number): Promise<UserRecord | undefined> {
+  const rows = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+  return rows[0] ? rowToUser(rows[0]) : undefined;
 }
 
-export function blockUser(userId: number): boolean {
-  const u = users.get(userId);
-  if (!u) return false;
-  u.isBlocked = true; saveData(); return true;
+export async function getAllUsers(): Promise<UserRecord[]> {
+  const rows = await db.select().from(users);
+  return rows.map(rowToUser);
 }
 
-export function unblockUser(userId: number): boolean {
-  const u = users.get(userId);
-  if (!u) return false;
-  u.isBlocked = false; saveData(); return true;
+export async function getBlockedUsers(): Promise<UserRecord[]> {
+  const rows = await db.select().from(users).where(eq(users.isBlocked, true));
+  return rows.map(rowToUser);
 }
 
-export function getUserBalance(userId: number): number { return users.get(userId)?.balance ?? 0; }
-
-export function addBalance(userId: number, amount: number): boolean {
-  const u = users.get(userId);
-  if (!u) return false;
-  u.balance += amount; saveData(); return true;
+export async function getUserCount(): Promise<number> {
+  const [row] = await db.select({ count: sql<number>`count(*)` }).from(users);
+  return Number(row?.count ?? 0);
 }
 
-export function deductBalance(userId: number, amount: number): boolean {
-  const u = users.get(userId);
-  if (!u || u.balance < amount) return false;
-  u.balance -= amount; saveData(); return true;
+export async function isUserActivated(userId: number): Promise<boolean> {
+  const rows = await db.select({ isActivated: users.isActivated }).from(users).where(eq(users.id, userId)).limit(1);
+  return rows[0]?.isActivated ?? false;
+}
+
+export async function isUserBlocked(userId: number): Promise<boolean> {
+  const rows = await db.select({ isBlocked: users.isBlocked }).from(users).where(eq(users.id, userId)).limit(1);
+  return rows[0]?.isBlocked ?? false;
+}
+
+export async function activateUser(userId: number): Promise<void> {
+  await db.update(users).set({ isActivated: true, activatedAt: new Date() }).where(eq(users.id, userId));
+}
+
+export async function blockUser(userId: number): Promise<boolean> {
+  const result = await db.update(users).set({ isBlocked: true }).where(eq(users.id, userId));
+  return (result as unknown as { rowCount?: number })?.rowCount !== 0;
+}
+
+export async function unblockUser(userId: number): Promise<boolean> {
+  const result = await db.update(users).set({ isBlocked: false }).where(eq(users.id, userId));
+  return (result as unknown as { rowCount?: number })?.rowCount !== 0;
+}
+
+export async function getUserBalance(userId: number): Promise<number> {
+  const rows = await db.select({ balance: users.balance }).from(users).where(eq(users.id, userId)).limit(1);
+  return rows[0]?.balance ?? 0;
+}
+
+export async function addBalance(userId: number, amount: number): Promise<boolean> {
+  const result = await db
+    .update(users)
+    .set({ balance: sql`${users.balance} + ${amount}` })
+    .where(eq(users.id, userId));
+  return (result as unknown as { rowCount?: number })?.rowCount !== 0;
+}
+
+export async function deductBalance(userId: number, amount: number): Promise<boolean> {
+  const result = await db
+    .update(users)
+    .set({ balance: sql`${users.balance} - ${amount}` })
+    .where(and(eq(users.id, userId), sql`${users.balance} >= ${amount}`));
+  return (result as unknown as { rowCount?: number })?.rowCount !== 0;
 }
 
 // ── Tokens ────────────────────────────────────────────────────────────────────
-export function createToken(adminId: number): string {
+export async function createToken(adminId: number): Promise<string> {
   let code = generateTokenCode();
-  while (tokens.has(code)) code = generateTokenCode();
-  tokens.set(code, { code, createdByAdminId: adminId, createdAt: new Date(), isUsed: false });
-  saveData(); return code;
+  while (true) {
+    const existing = await db.select().from(tokens).where(eq(tokens.code, code)).limit(1);
+    if (existing.length === 0) break;
+    code = generateTokenCode();
+  }
+  await db.insert(tokens).values({ code, createdByAdminId: adminId, isUsed: false });
+  return code;
 }
 
-export function validateAndUseToken(code: string, userId: number): { valid: boolean; reason?: string } {
-  const norm  = code.trim().toUpperCase();
-  const token = tokens.get(norm);
-  if (!token) return { valid: false, reason: "not_found" };
+export async function validateAndUseToken(
+  code: string, userId: number,
+): Promise<{ valid: boolean; reason?: string }> {
+  const norm = code.trim().toUpperCase();
+  const rows = await db.select().from(tokens).where(eq(tokens.code, norm)).limit(1);
+  if (rows.length === 0) return { valid: false, reason: "not_found" };
+  const token = rows[0]!;
   if (token.isUsed) return { valid: false, reason: "already_used" };
-  token.isUsed = true; token.usedByUserId = userId; token.usedAt = new Date();
-  activateUser(userId); saveData(); return { valid: true };
+  await db.update(tokens).set({ isUsed: true, usedByUserId: userId, usedAt: new Date() }).where(eq(tokens.code, norm));
+  await activateUser(userId);
+  return { valid: true };
 }
 
-export function getTokenCount(): number { return tokens.size; }
-export function getUnusedTokenCount(): number { return Array.from(tokens.values()).filter((t) => !t.isUsed).length; }
+export async function getTokenCount(): Promise<number> {
+  const [row] = await db.select({ count: sql<number>`count(*)` }).from(tokens);
+  return Number(row?.count ?? 0);
+}
+
+export async function getUnusedTokenCount(): Promise<number> {
+  const [row] = await db.select({ count: sql<number>`count(*)` }).from(tokens).where(eq(tokens.isUsed, false));
+  return Number(row?.count ?? 0);
+}
 
 // ── Balance Requests ──────────────────────────────────────────────────────────
-export function createBalanceRequest(userId: number, amount: number): string {
+export async function createBalanceRequest(userId: number, amount: number): Promise<string> {
   let id = generateShortId();
-  while (balanceRequests.has(id)) id = generateShortId();
-  balanceRequests.set(id, { id, userId, amount, requestedAt: new Date(), status: "pending" });
-  saveData(); return id;
+  while (true) {
+    const existing = await db.select().from(balanceRequests).where(eq(balanceRequests.id, id)).limit(1);
+    if (existing.length === 0) break;
+    id = generateShortId();
+  }
+  await db.insert(balanceRequests).values({ id, userId, amount, status: "pending" });
+  return id;
 }
 
-export function getBalanceRequest(id: string): BalanceRequest | undefined { return balanceRequests.get(id); }
+export async function getBalanceRequest(id: string): Promise<BalanceRequest | undefined> {
+  const rows = await db.select().from(balanceRequests).where(eq(balanceRequests.id, id)).limit(1);
+  if (!rows[0]) return undefined;
+  const r = rows[0];
+  return { id: r.id, userId: r.userId, amount: r.amount, requestedAt: r.requestedAt, status: r.status as BalanceRequest["status"] };
+}
 
-export function approveBalanceRequest(requestId: string): { ok: boolean; userId?: number; amount?: number } {
-  const req = balanceRequests.get(requestId);
+export async function approveBalanceRequest(requestId: string): Promise<{ ok: boolean; userId?: number; amount?: number }> {
+  const req = await getBalanceRequest(requestId);
   if (!req || req.status !== "pending") return { ok: false };
-  req.status = "approved"; addBalance(req.userId, req.amount); saveData();
+  await db.update(balanceRequests).set({ status: "approved" }).where(eq(balanceRequests.id, requestId));
+  await addBalance(req.userId, req.amount);
   return { ok: true, userId: req.userId, amount: req.amount };
 }
 
-export function rejectBalanceRequest(requestId: string): boolean {
-  const req = balanceRequests.get(requestId);
+export async function rejectBalanceRequest(requestId: string): Promise<boolean> {
+  const req = await getBalanceRequest(requestId);
   if (!req || req.status !== "pending") return false;
-  req.status = "rejected"; saveData(); return true;
+  await db.update(balanceRequests).set({ status: "rejected" }).where(eq(balanceRequests.id, requestId));
+  return true;
 }
 
-export function transferBalance(
-  fromUserId: number, toUserId: number, amount: number
-): { ok: boolean; reason?: string } {
-  if (!users.has(toUserId)) return { ok: false, reason: "target_not_found" };
-  if (!deductBalance(fromUserId, amount)) return { ok: false, reason: "insufficient_balance" };
-  addBalance(toUserId, amount); return { ok: true };
+export async function transferBalance(
+  fromUserId: number, toUserId: number, amount: number,
+): Promise<{ ok: boolean; reason?: string }> {
+  const toExists = await db.select({ id: users.id }).from(users).where(eq(users.id, toUserId)).limit(1);
+  if (toExists.length === 0) return { ok: false, reason: "target_not_found" };
+  const deducted = await deductBalance(fromUserId, amount);
+  if (!deducted) return { ok: false, reason: "insufficient_balance" };
+  await addBalance(toUserId, amount);
+  return { ok: true };
 }
 
 // ── Support Tickets ───────────────────────────────────────────────────────────
-export function createSupportTicket(userId: number, text: string): SupportTicket {
+export async function createSupportTicket(userId: number, text: string): Promise<SupportTicket> {
   let id = generateShortId("TK");
-  while (ticketsMap.has(id)) id = generateShortId("TK");
-  const ticket: SupportTicket = {
-    id, userId, status: "open", createdAt: new Date(),
-    messages: [{ from: "user", text, at: new Date() }],
+  while (true) {
+    const existing = await db.select().from(supportTickets).where(eq(supportTickets.id, id)).limit(1);
+    if (existing.length === 0) break;
+    id = generateShortId("TK");
+  }
+  const now = new Date();
+  await db.insert(supportTickets).values({ id, userId, status: "open", createdAt: now });
+  await db.insert(ticketMessages).values({ ticketId: id, fromRole: "user", text, at: now });
+  return {
+    id, userId, status: "open", createdAt: now,
+    messages: [{ from: "user", text, at: now }],
   };
-  ticketsMap.set(id, ticket);
-  saveData(); return ticket;
 }
 
-export function getOpenTicketByUser(userId: number): SupportTicket | undefined {
-  return Array.from(ticketsMap.values()).find(t => t.userId === userId && t.status === "open");
+export async function getOpenTicketByUser(userId: number): Promise<SupportTicket | undefined> {
+  const rows = await db.select().from(supportTickets)
+    .where(and(eq(supportTickets.userId, userId), eq(supportTickets.status, "open")))
+    .limit(1);
+  if (!rows[0]) return undefined;
+  return buildTicket(rows[0]);
 }
 
-export function getSupportTicket(id: string): SupportTicket | undefined { return ticketsMap.get(id); }
-
-export function addTicketMessage(ticketId: string, from: "user" | "admin", text: string): boolean {
-  const ticket = ticketsMap.get(ticketId);
-  if (!ticket) return false;
-  ticket.messages.push({ from, text, at: new Date() });
-  saveData(); return true;
+export async function getSupportTicket(id: string): Promise<SupportTicket | undefined> {
+  const rows = await db.select().from(supportTickets).where(eq(supportTickets.id, id)).limit(1);
+  if (!rows[0]) return undefined;
+  return buildTicket(rows[0]);
 }
 
-export function closeSupportTicket(ticketId: string): boolean {
-  const ticket = ticketsMap.get(ticketId);
-  if (!ticket || ticket.status === "closed") return false;
-  ticket.status = "closed";
-  saveData(); return true;
+export async function addTicketMessage(ticketId: string, from: "user" | "admin", text: string): Promise<boolean> {
+  const rows = await db.select({ id: supportTickets.id }).from(supportTickets).where(eq(supportTickets.id, ticketId)).limit(1);
+  if (!rows[0]) return false;
+  await db.insert(ticketMessages).values({ ticketId, fromRole: from, text, at: new Date() });
+  return true;
 }
 
-export function getOpenTicketsCount(): number {
-  return Array.from(ticketsMap.values()).filter(t => t.status === "open").length;
+export async function closeSupportTicket(ticketId: string): Promise<boolean> {
+  const rows = await db.select().from(supportTickets).where(and(eq(supportTickets.id, ticketId), eq(supportTickets.status, "open"))).limit(1);
+  if (!rows[0]) return false;
+  await db.update(supportTickets).set({ status: "closed" }).where(eq(supportTickets.id, ticketId));
+  return true;
 }
 
-export function findUserByUsername(username: string): UserRecord | undefined {
+export async function getOpenTicketsCount(): Promise<number> {
+  const [row] = await db.select({ count: sql<number>`count(*)` }).from(supportTickets).where(eq(supportTickets.status, "open"));
+  return Number(row?.count ?? 0);
+}
+
+export async function findUserByUsername(username: string): Promise<UserRecord | undefined> {
   const q = username.replace(/^@/, "").toLowerCase();
-  return Array.from(users.values()).find(u => u.username?.toLowerCase() === q);
+  const rows = await db.select().from(users).where(sql`LOWER(${users.username}) = ${q}`).limit(1);
+  return rows[0] ? rowToUser(rows[0]) : undefined;
 }
 
-export function getAllOpenTickets(): SupportTicket[] {
-  return Array.from(ticketsMap.values())
-    .filter(t => t.status === "open")
-    .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+export async function getAllOpenTickets(): Promise<SupportTicket[]> {
+  const rows = await db.select().from(supportTickets)
+    .where(eq(supportTickets.status, "open"))
+    .orderBy(supportTickets.createdAt);
+  return Promise.all(rows.map(buildTicket));
 }
 
 // ── Card Number ───────────────────────────────────────────────────────────────
-export function setCardNumber(card: string): void { cardNumber = card; saveData(); }
-export function getCardNumber(): string { return cardNumber; }
+let _cardNumber: string | null = null;
 
-// ── Pending States ────────────────────────────────────────────────────────────
+export async function getCardNumber(): Promise<string> {
+  if (_cardNumber !== null) return _cardNumber;
+  const rows = await db.select().from(settings).where(eq(settings.key, "card_number")).limit(1);
+  _cardNumber = rows[0]?.value ?? "";
+  return _cardNumber;
+}
+
+export async function setCardNumber(card: string): Promise<void> {
+  _cardNumber = card;
+  await db.insert(settings).values({ key: "card_number", value: card })
+    .onConflictDoUpdate({ target: settings.key, set: { value: card } });
+}
+
+// ── Ticket Reminders ──────────────────────────────────────────────────────────
+export async function getTicketsNeedingReminder(thresholdMs: number): Promise<SupportTicket[]> {
+  const rows = await db.select().from(supportTickets)
+    .where(eq(supportTickets.status, "open"))
+    .orderBy(supportTickets.createdAt);
+  const tickets = await Promise.all(rows.map(buildTicket));
+  const now = Date.now();
+  return tickets.filter(ticket => {
+    if (ticket.messages.length === 0) return false;
+    const lastMsg = ticket.messages[ticket.messages.length - 1]!;
+    if (lastMsg.from !== "user") return false;
+    if (now - lastMsg.at.getTime() < thresholdMs) return false;
+    if (ticket.lastReminderAt && now - ticket.lastReminderAt.getTime() < thresholdMs) return false;
+    return true;
+  });
+}
+
+export async function markTicketReminded(ticketId: string): Promise<void> {
+  await db.update(supportTickets).set({ lastReminderAt: new Date() }).where(eq(supportTickets.id, ticketId));
+}
+
+// ── Pending States (in-memory — transient) ────────────────────────────────────
 type PendingSet =
   | "broadcast" | "tokenEntry" | "addBalance" | "transferInput"
   | "cardNumberInput" | "adminTransfer" | "adminAddBalance" | "adminAddBalanceAmount"
@@ -350,28 +439,3 @@ export function setAdminTicketTarget(adminId: number, ticketId: string): void {
   adminTicketTarget.set(adminId, ticketId);
 }
 export function getAdminTicketTarget(adminId: number): string | undefined { return adminTicketTarget.get(adminId); }
-
-// ── Ticket Reminders ──────────────────────────────────────────────────────────
-export function getTicketsNeedingReminder(thresholdMs: number): SupportTicket[] {
-  const now = Date.now();
-  const result: SupportTicket[] = [];
-  for (const ticket of ticketsMap.values()) {
-    if (ticket.status !== "open") continue;
-    if (ticket.messages.length === 0) continue;
-    const lastMsg = ticket.messages[ticket.messages.length - 1]!;
-    if (lastMsg.from !== "user") continue;
-    const timeSinceLastMsg = now - lastMsg.at.getTime();
-    if (timeSinceLastMsg < thresholdMs) continue;
-    if (ticket.lastReminderAt) {
-      const timeSinceReminder = now - ticket.lastReminderAt.getTime();
-      if (timeSinceReminder < thresholdMs) continue;
-    }
-    result.push(ticket);
-  }
-  return result;
-}
-
-export function markTicketReminded(ticketId: string): void {
-  const ticket = ticketsMap.get(ticketId);
-  if (ticket) { ticket.lastReminderAt = new Date(); saveData(); }
-}
