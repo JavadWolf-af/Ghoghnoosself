@@ -454,6 +454,9 @@ bot.on("message", async (msg) => {
         clearAllPending(userId);
         if (fromManage) await sendAdminManage(chatId);
         else await sendAdminPanel(chatId);
+      } else if (isUserBlocked(userId)) {
+        clearAllPending(userId);
+        await sendTracked(chatId, BLOCKED_ONLY_SUPPORT(), { parse_mode: "Markdown", reply_markup: blockedKeyboard() });
       } else {
         const fromWallet = isPendingWallet(userId);
         clearAllPending(userId);
@@ -642,7 +645,9 @@ bot.on("message", async (msg) => {
         await sendAdminManage(chatId);
         await sendTracked(chatId, BLOCKED_LIST_MESSAGE(blockedUsers), { parse_mode: "Markdown" });
         for (const u of blockedUsers) {
-          await sendTracked(chatId, `👤 *${u.firstName}*${u.username ? ` (@${u.username})` : ""} — \`${u.id}\``, {
+          const name = u.firstName.replace(/[_*`[]/g, "\\$&");
+          const uname = u.username ? ` (@${u.username.replace(/[_*`[]/g, "\\$&")})` : "";
+          await sendTracked(chatId, `👤 *${name}*${uname} — \`${u.id}\``, {
             parse_mode: "Markdown",
             reply_markup: unblockKeyboard(u.id),
           });
