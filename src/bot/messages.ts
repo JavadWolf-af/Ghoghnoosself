@@ -525,3 +525,101 @@ export const ADMIN_TICKET_REMINDER = (
   `🕐 بیش از *${waitHours} ساعت* بدون پاسخ\n\n` +
   `━━━━━━━━━━━━━━━━━\n` +
   `💬 *آخرین پیام:*\n_${esc(lastMessageText).slice(0, 200)}${lastMessageText.length > 200 ? "…" : ""}_`;
+
+// ── Token Billing ─────────────────────────────────────────────────────────────
+
+export const ADMIN_TOKEN_COST_MESSAGE = (
+  daily: number, monthly: number, activeCount: number, graceCount: number,
+): string =>
+  `🔑 *هزینه توکن*\n\n` +
+  `━━━━━━━━━━━━━━━━━\n` +
+  `💵 هزینه روزانه: *${daily > 0 ? daily.toLocaleString("fa-IR") + " تومان" : "تنظیم نشده"}*\n` +
+  `📅 هزینه ماهانه: *${monthly > 0 ? monthly.toLocaleString("fa-IR") + " تومان" : "—"}*\n\n` +
+  `━━━━━━━━━━━━━━━━━\n` +
+  `✅ توکن‌های فعال: *${activeCount}*\n` +
+  `⏳ در دوره گریس: *${graceCount}*`;
+
+export const TOKEN_COST_PROMPT = (): string =>
+  `✏️ *تنظیم هزینه روزانه توکن*\n\n` +
+  `━━━━━━━━━━━━━━━━━\n` +
+  `هزینه روزانه به *تومان* را وارد کنید:\n\n` +
+  `مثال: \`1000\` (روزی ۱۰۰۰ تومان)\n\n` +
+  `برای غیرفعال کردن صورتحساب، عدد \`0\` وارد کنید.\n\n` +
+  `↩️ برای انصراف 🔙 را بزنید`;
+
+export const TOKEN_COST_SET = (daily: number, monthly: number): string =>
+  daily === 0
+    ? `✅ *صورتحساب غیرفعال شد*\n\nدیگر هزینه‌ای از کاربران کم نمی‌شود.`
+    : `✅ *هزینه توکن تنظیم شد*\n\n` +
+      `━━━━━━━━━━━━━━━━━\n` +
+      `💵 روزانه: *${daily.toLocaleString("fa-IR")} تومان*\n` +
+      `📅 ماهانه: *${monthly.toLocaleString("fa-IR")} تومان*\n\n` +
+      `از فردا اعمال می‌شود.`;
+
+export const BALANCE_LOW_WARNING = (daysLeft: number): string =>
+  `⚠️ *اعلان کیف پول — موجودی کم*\n\n` +
+  `━━━━━━━━━━━━━━━━━\n` +
+  `موجودی کیف پول شما به حدود *${daysLeft} روز* اشتراک رسیده است.\n\n` +
+  `لطفاً هر چه زودتر کیف پول خود را شارژ کنید تا سرویس شما قطع نشود 🙏\n\n` +
+  `از منوی اصلی → 💎 کیف پول → افزایش موجودی اقدام کنید.`;
+
+export const BALANCE_CRITICAL_WARNING = (daysLeft: number): string =>
+  `🚨 *هشدار مهم — موجودی بحرانی*\n\n` +
+  `━━━━━━━━━━━━━━━━━\n` +
+  `موجودی شما تنها برای *${daysLeft} روز* دیگر کافی است!\n\n` +
+  `اگر کیف پول شارژ نشود، سرویس شما به حالت تعلیق می‌رود.\n\n` +
+  `همین الان اقدام کنید 👇\n` +
+  `💎 کیف پول → افزایش موجودی`;
+
+export const TOKEN_GRACE_STARTED = (graceDays: number): string =>
+  `🔴 *توکن شما به تعلیق رفت*\n\n` +
+  `━━━━━━━━━━━━━━━━━\n` +
+  `موجودی کیف پول شما صفر شده و سرویس شما متوقف شده است.\n\n` +
+  `⏰ شما *${graceDays} روز* فرصت دارید کیف پول را شارژ کنید.\n` +
+  `در این صورت تنظیمات و سرویس شما *حفظ می‌شود*.\n\n` +
+  `در صورت عدم شارژ ظرف ${graceDays} روز، توکن شما *حذف* و تنظیمات *ریست* می‌شود.\n\n` +
+  `همین الان اقدام کنید 👇\n` +
+  `💎 کیف پول → افزایش موجودی`;
+
+export const TOKEN_GRACE_REMINDER = (daysLeft: number): string =>
+  `⏰ *یادآوری — توکن در حال انقضا*\n\n` +
+  `━━━━━━━━━━━━━━━━━\n` +
+  `توکن شما در *${daysLeft} روز دیگر* حذف خواهد شد.\n\n` +
+  `در صورت شارژ کیف پول و تأیید ادمین، تنظیمات شما حفظ خواهد ماند.\n\n` +
+  `💎 کیف پول → افزایش موجودی`;
+
+export const TOKEN_EXPIRED_NOTIFY = (): string =>
+  `❌ *توکن شما منقضی شد*\n\n` +
+  `━━━━━━━━━━━━━━━━━\n` +
+  `به دلیل عدم شارژ کیف پول در مدت مقرر، توکن شما حذف و تنظیمات ریست شد.\n\n` +
+  `برای استفاده مجدد با پشتیبانی تماس بگیرید یا توکن جدید دریافت کنید.`;
+
+export const ADMIN_GRACE_TOKENS_HEADER = (count: number): string =>
+  count === 0
+    ? `✅ *هیچ توکنی در دوره گریس نیست*`
+    : `⏳ *توکن‌های در دوره گریس* — ${count} عدد\n\n` +
+      `━━━━━━━━━━━━━━━━━\n` +
+      `اگر کاربر کیف پول را شارژ کرد، از دکمه بازگردانی استفاده کنید:`;
+
+export const ADMIN_GRACE_TOKEN_ITEM = (
+  tokenCode: string, userId: number, firstName: string,
+  username: string | undefined, graceStartedAt: Date, daysLeft: number,
+): string =>
+  `⏳ توکن: \`${tokenCode}\`\n` +
+  `👤 *${firstName}*${username ? ` (@${username})` : ""} — \`${userId}\`\n` +
+  `📅 شروع گریس: ${graceStartedAt.toLocaleDateString("fa-IR")}\n` +
+  `⏰ باقی‌مانده: *${daysLeft} روز*`;
+
+export const ADMIN_TOKEN_RESTORED = (firstName: string, userId: number): string =>
+  `🔄 *توکن بازگردانده شد*\n\n` +
+  `👤 کاربر: *${firstName}* (\`${userId}\`)\n` +
+  `✅ توکن فعال شد و تنظیمات حفظ گردید.`;
+
+export const ADMIN_BILLING_REPORT = (
+  billed: number, graceStarted: number, expired: number,
+): string =>
+  `📊 *گزارش صورتحساب روزانه*\n\n` +
+  `━━━━━━━━━━━━━━━━━\n` +
+  `✅ کسر موفق: *${billed}* توکن\n` +
+  `⏳ وارد گریس شده: *${graceStarted}* توکن\n` +
+  `❌ منقضی شده: *${expired}* توکن`;
