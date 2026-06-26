@@ -162,14 +162,23 @@ export async function activateUser(userId: number): Promise<void> {
   await db.update(users).set({ isActivated: true, activatedAt: new Date() }).where(eq(users.id, userId));
 }
 
+// FIX: use .returning() instead of unsafe rowCount cast
 export async function blockUser(userId: number): Promise<boolean> {
-  const result = await db.update(users).set({ isBlocked: true }).where(eq(users.id, userId));
-  return (result as unknown as { rowCount?: number })?.rowCount !== 0;
+  const result = await db
+    .update(users)
+    .set({ isBlocked: true })
+    .where(eq(users.id, userId))
+    .returning({ id: users.id });
+  return result.length > 0;
 }
 
 export async function unblockUser(userId: number): Promise<boolean> {
-  const result = await db.update(users).set({ isBlocked: false }).where(eq(users.id, userId));
-  return (result as unknown as { rowCount?: number })?.rowCount !== 0;
+  const result = await db
+    .update(users)
+    .set({ isBlocked: false })
+    .where(eq(users.id, userId))
+    .returning({ id: users.id });
+  return result.length > 0;
 }
 
 export async function getUserBalance(userId: number): Promise<number> {
@@ -177,20 +186,23 @@ export async function getUserBalance(userId: number): Promise<number> {
   return rows[0]?.balance ?? 0;
 }
 
+// FIX: use .returning() instead of unsafe rowCount cast
 export async function addBalance(userId: number, amount: number): Promise<boolean> {
   const result = await db
     .update(users)
     .set({ balance: sql`${users.balance} + ${amount}` })
-    .where(eq(users.id, userId));
-  return (result as unknown as { rowCount?: number })?.rowCount !== 0;
+    .where(eq(users.id, userId))
+    .returning({ id: users.id });
+  return result.length > 0;
 }
 
 export async function deductBalance(userId: number, amount: number): Promise<boolean> {
   const result = await db
     .update(users)
     .set({ balance: sql`${users.balance} - ${amount}` })
-    .where(and(eq(users.id, userId), sql`${users.balance} >= ${amount}`));
-  return (result as unknown as { rowCount?: number })?.rowCount !== 0;
+    .where(and(eq(users.id, userId), sql`${users.balance} >= ${amount}`))
+    .returning({ id: users.id });
+  return result.length > 0;
 }
 
 // ── Tokens ────────────────────────────────────────────────────────────────────
@@ -205,15 +217,23 @@ export async function createToken(adminId: number): Promise<string> {
   return code;
 }
 
+// FIX: atomic update — prevents double-use race condition
 export async function validateAndUseToken(
   code: string, userId: number,
 ): Promise<{ valid: boolean; reason?: string }> {
   const norm = code.trim().toUpperCase();
   const rows = await db.select().from(tokens).where(eq(tokens.code, norm)).limit(1);
   if (rows.length === 0) return { valid: false, reason: "not_found" };
-  const token = rows[0]!;
-  if (token.isUsed) return { valid: false, reason: "already_used" };
-  await db.update(tokens).set({ isUsed: true, usedByUserId: userId, usedAt: new Date() }).where(eq(tokens.code, norm));
+  if (rows[0]!.isUsed) return { valid: false, reason: "already_used" };
+
+  // Atomic: only succeeds if token is still unused at the moment of update
+  const updated = await db
+    .update(tokens)
+    .set({ isUsed: true, usedByUserId: userId, usedAt: new Date() })
+    .where(and(eq(tokens.code, norm), eq(tokens.isUsed, false)))
+    .returning({ code: tokens.code });
+
+  if (updated.length === 0) return { valid: false, reason: "already_used" };
   await activateUser(userId);
   return { valid: true };
 }
@@ -229,15 +249,20 @@ export async function getUnusedTokenCount(): Promise<number> {
 }
 
 // ── Balance Requests ──────────────────────────────────────────────────────────
-export async function createBalanceRequest(userId: number, amount: number): Promise<string> {
+// FIX: now stores receipt photo file_id for auditability after bot restarts
+export async function createBalanceRequest(
+  userId: number, amount: number, receiptFileId: string,
+): Promise<string> {
   let id = generateShortId();
+  // Retry on PK collision (concurrent requests with same generated ID)
   while (true) {
-    const existing = await db.select().from(balanceRequests).where(eq(balanceRequests.id, id)).limit(1);
-    if (existing.length === 0) break;
-    id = generateShortId();
+    try {
+      await db.insert(balanceRequests).values({ id, userId, amount, receiptFileId, status: "pending" });
+      return id;
+    } catch {
+      id = generateShortId();
+    }
   }
-  await db.insert(balanceRequests).values({ id, userId, amount, status: "pending" });
-  return id;
 }
 
 export async function getBalanceRequest(id: string): Promise<BalanceRequest | undefined> {
@@ -247,47 +272,78 @@ export async function getBalanceRequest(id: string): Promise<BalanceRequest | un
   return { id: r.id, userId: r.userId, amount: r.amount, requestedAt: r.requestedAt, status: r.status as BalanceRequest["status"] };
 }
 
+// FIX: wrapped in a transaction — prevents double-approval race condition
 export async function approveBalanceRequest(requestId: string): Promise<{ ok: boolean; userId?: number; amount?: number }> {
-  const req = await getBalanceRequest(requestId);
-  if (!req || req.status !== "pending") return { ok: false };
-  await db.update(balanceRequests).set({ status: "approved" }).where(eq(balanceRequests.id, requestId));
-  await addBalance(req.userId, req.amount);
-  return { ok: true, userId: req.userId, amount: req.amount };
+  return db.transaction(async (tx) => {
+    // Atomic status update — only succeeds if still pending
+    const updated = await tx
+      .update(balanceRequests)
+      .set({ status: "approved" })
+      .where(and(eq(balanceRequests.id, requestId), eq(balanceRequests.status, "pending")))
+      .returning({ userId: balanceRequests.userId, amount: balanceRequests.amount });
+
+    if (updated.length === 0) return { ok: false };
+    const { userId, amount } = updated[0]!;
+
+    await tx
+      .update(users)
+      .set({ balance: sql`${users.balance} + ${amount}` })
+      .where(eq(users.id, userId));
+
+    return { ok: true, userId, amount };
+  });
 }
 
 export async function rejectBalanceRequest(requestId: string): Promise<boolean> {
-  const req = await getBalanceRequest(requestId);
-  if (!req || req.status !== "pending") return false;
-  await db.update(balanceRequests).set({ status: "rejected" }).where(eq(balanceRequests.id, requestId));
-  return true;
+  const updated = await db
+    .update(balanceRequests)
+    .set({ status: "rejected" })
+    .where(and(eq(balanceRequests.id, requestId), eq(balanceRequests.status, "pending")))
+    .returning({ id: balanceRequests.id });
+  return updated.length > 0;
 }
 
+// FIX: wrapped in a transaction — prevents money loss if server crashes mid-transfer
 export async function transferBalance(
   fromUserId: number, toUserId: number, amount: number,
 ): Promise<{ ok: boolean; reason?: string }> {
-  const toExists = await db.select({ id: users.id }).from(users).where(eq(users.id, toUserId)).limit(1);
-  if (toExists.length === 0) return { ok: false, reason: "target_not_found" };
-  const deducted = await deductBalance(fromUserId, amount);
-  if (!deducted) return { ok: false, reason: "insufficient_balance" };
-  await addBalance(toUserId, amount);
-  return { ok: true };
+  return db.transaction(async (tx) => {
+    const toExists = await tx.select({ id: users.id }).from(users).where(eq(users.id, toUserId)).limit(1);
+    if (toExists.length === 0) return { ok: false, reason: "target_not_found" };
+
+    const deducted = await tx
+      .update(users)
+      .set({ balance: sql`${users.balance} - ${amount}` })
+      .where(and(eq(users.id, fromUserId), sql`${users.balance} >= ${amount}`))
+      .returning({ id: users.id });
+
+    if (deducted.length === 0) return { ok: false, reason: "insufficient_balance" };
+
+    await tx
+      .update(users)
+      .set({ balance: sql`${users.balance} + ${amount}` })
+      .where(eq(users.id, toUserId));
+
+    return { ok: true };
+  });
 }
 
 // ── Support Tickets ───────────────────────────────────────────────────────────
 export async function createSupportTicket(userId: number, text: string): Promise<SupportTicket> {
   let id = generateShortId("TK");
   while (true) {
-    const existing = await db.select().from(supportTickets).where(eq(supportTickets.id, id)).limit(1);
-    if (existing.length === 0) break;
-    id = generateShortId("TK");
+    try {
+      const now = new Date();
+      await db.insert(supportTickets).values({ id, userId, status: "open", createdAt: now });
+      await db.insert(ticketMessages).values({ ticketId: id, fromRole: "user", text, at: now });
+      return {
+        id, userId, status: "open", createdAt: now,
+        messages: [{ from: "user", text, at: now }],
+      };
+    } catch {
+      id = generateShortId("TK");
+    }
   }
-  const now = new Date();
-  await db.insert(supportTickets).values({ id, userId, status: "open", createdAt: now });
-  await db.insert(ticketMessages).values({ ticketId: id, fromRole: "user", text, at: now });
-  return {
-    id, userId, status: "open", createdAt: now,
-    messages: [{ from: "user", text, at: now }],
-  };
 }
 
 export async function getOpenTicketByUser(userId: number): Promise<SupportTicket | undefined> {
@@ -312,10 +368,12 @@ export async function addTicketMessage(ticketId: string, from: "user" | "admin",
 }
 
 export async function closeSupportTicket(ticketId: string): Promise<boolean> {
-  const rows = await db.select().from(supportTickets).where(and(eq(supportTickets.id, ticketId), eq(supportTickets.status, "open"))).limit(1);
-  if (!rows[0]) return false;
-  await db.update(supportTickets).set({ status: "closed" }).where(eq(supportTickets.id, ticketId));
-  return true;
+  const updated = await db
+    .update(supportTickets)
+    .set({ status: "closed" })
+    .where(and(eq(supportTickets.id, ticketId), eq(supportTickets.status, "open")))
+    .returning({ id: supportTickets.id });
+  return updated.length > 0;
 }
 
 export async function getOpenTicketsCount(): Promise<number> {
