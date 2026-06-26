@@ -9,6 +9,8 @@ SERVICE_NAME="ghoghnoosself"
 NODE_MIN_VERSION=18
 BIN_UPDATE="/usr/local/bin/update-ghoghnoosself"
 BIN_UNINSTALL="/usr/local/bin/uninstall-ghoghnoosself"
+BIN_BACKUP="/usr/local/bin/backup-ghoghnoosself"
+BIN_IMPORT="/usr/local/bin/import-ghoghnoosself"
 DB_NAME="ghoghnoosself"
 DB_USER="ghoghnoosself"
 
@@ -148,7 +150,10 @@ info "ساخت دستورات update/uninstall..."
 printf '#!/usr/bin/env bash\nbash "%s/update.sh"\n' "$INSTALL_DIR" | sudo tee "$BIN_UPDATE"    > /dev/null
 printf '#!/usr/bin/env bash\nbash "%s/uninstall.sh"\n' "$INSTALL_DIR" | sudo tee "$BIN_UNINSTALL" > /dev/null
 sudo chmod +x "$BIN_UPDATE" "$BIN_UNINSTALL"
-success "update-ghoghnoosself و uninstall-ghoghnoosself آماده‌اند."
+printf '#!/usr/bin/env bash\nbash "%s/backup.sh"\n' "$INSTALL_DIR" | sudo tee "$BIN_BACKUP" > /dev/null
+printf '#!/usr/bin/env bash\nbash "%s/import.sh" "$@"\n' "$INSTALL_DIR" | sudo tee "$BIN_IMPORT" > /dev/null
+sudo chmod +x "$BIN_BACKUP" "$BIN_IMPORT"
+success "update-ghoghnoosself و uninstall-ghoghnoosself و backup-ghoghnoosself و import-ghoghnoosself آماده‌اند."
 
 # ── نصب وابستگی‌ها ───────────────────────────────────────────────────────────
 info "نصب وابستگی‌ها..."
@@ -208,7 +213,9 @@ echo -e "  🔧 تنظیمات: ${CYAN}$INSTALL_DIR/.env${NC}"
 echo ""
 echo -e "  📌 دستورات:"
 echo -e "     ${YELLOW}update-ghoghnoosself${NC}    — آپدیت"
-echo -e "     ${YELLOW}uninstall-ghoghnoosself${NC} — حذف کامل"
+echo -e "     ${YELLOW}uninstall-ghoghnoosself${NC} — حذف کامل
+     ${YELLOW}backup-ghoghnoosself${NC}    — بکاپ از دیتابیس
+     ${YELLOW}import-ghoghnoosself <file>${NC} — ایمپورت دیتابیس"
 echo ""
 echo -e "  🗄️  دیتابیس:"
 echo -e "     ${YELLOW}journalctl -u ghoghnoosself -f${NC}  — لاگ‌های ربات"
