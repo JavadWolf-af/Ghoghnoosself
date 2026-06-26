@@ -101,9 +101,17 @@ if [[ -f "$INSTALL_DIR/data/db.json" ]]; then
   warn "داده‌های قدیمی JSON بکاپ گرفته شد: $BACKUP_FILE"
 fi
 
+info "پاک‌سازی node_modules برای جلوگیری از تداخل نسخه‌ها..."
+rm -rf node_modules package-lock.json 2>/dev/null || true
+success "node_modules پاک شد."
+
 info "نصب وابستگی‌ها..."
-NODE_ENV=development npm install --include=dev --legacy-peer-deps
+NODE_ENV=development npm install --include=dev --legacy-peer-deps --foreground-scripts
 success "وابستگی‌ها بررسی شدند."
+
+info "نصب Chromium برای Puppeteer..."
+node -e "require('puppeteer')" 2>/dev/null &&   node -e "const p=require('puppeteer');p.executablePath&&console.log('Chromium OK')" 2>/dev/null ||   npx puppeteer browsers install chrome 2>/dev/null || true
+success "Puppeteer آماده است."
 
 info "بیلد ربات..."
 set -a; source "$INSTALL_DIR/.env"; set +a
@@ -124,4 +132,5 @@ fi
 echo ""
 echo -e "${GREEN}✅ آپدیت با موفقیت انجام شد! (v2 — PostgreSQL)${NC}"
 echo ""
+
 
