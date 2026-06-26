@@ -8,7 +8,7 @@ export async function initDb(): Promise<void> {
       first_name      VARCHAR(256) NOT NULL,
       last_name       VARCHAR(256),
       username        VARCHAR(256),
-      balance         INTEGER NOT NULL DEFAULT 0,
+      balance         BIGINT NOT NULL DEFAULT 0,
       is_activated    BOOLEAN NOT NULL DEFAULT FALSE,
       activated_at    TIMESTAMP,
       is_blocked      BOOLEAN NOT NULL DEFAULT FALSE,
@@ -26,11 +26,12 @@ export async function initDb(): Promise<void> {
       used_at            TIMESTAMP
     );
     CREATE TABLE IF NOT EXISTS balance_requests (
-      id           VARCHAR(32) PRIMARY KEY,
-      user_id      BIGINT NOT NULL,
-      amount       INTEGER NOT NULL,
-      requested_at TIMESTAMP NOT NULL DEFAULT NOW(),
-      status       VARCHAR(16) NOT NULL DEFAULT 'pending'
+      id              VARCHAR(32) PRIMARY KEY,
+      user_id         BIGINT NOT NULL,
+      amount          BIGINT NOT NULL,
+      receipt_file_id VARCHAR(256),
+      requested_at    TIMESTAMP NOT NULL DEFAULT NOW(),
+      status          VARCHAR(16) NOT NULL DEFAULT 'pending'
     );
     CREATE TABLE IF NOT EXISTS support_tickets (
       id               VARCHAR(32) PRIMARY KEY,
@@ -55,4 +56,20 @@ export async function initDb(): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_support_tickets_status    ON support_tickets (status);
     CREATE INDEX IF NOT EXISTS idx_users_username            ON users (username);
   `);
+
+  /* ── Migrations for existing installations ─────────────────────────────── */
+  await db.execute(sql`
+    ALTER TABLE users
+      ALTER COLUMN balance TYPE BIGINT;
+  `).catch(() => { /* already BIGINT or migration already applied */ });
+
+  await db.execute(sql`
+    ALTER TABLE balance_requests
+      ALTER COLUMN amount TYPE BIGINT;
+  `).catch(() => {});
+
+  await db.execute(sql`
+    ALTER TABLE balance_requests
+      ADD COLUMN IF NOT EXISTS receipt_file_id VARCHAR(256);
+  `).catch(() => {});
 }
