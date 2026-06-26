@@ -625,3 +625,66 @@ export const ADMIN_BILLING_REPORT = (
   `✅ کسر موفق: *${billed}* توکن\n` +
   `⏳ وارد گریس شده: *${graceStarted}* توکن\n` +
   `❌ منقضی شده: *${expired}* توکن`;
+
+// ── Admin User Billing Dashboard ─────────────────────────────────────────────
+
+export const ADMIN_USER_BILLING_DASHBOARD = (
+  user: { id: number; firstName: string; username?: string; balance: number },
+  hourlyCost: number,
+  tokenStatus: "active" | "grace" | "expired" | "none",
+  tokenCode: string | undefined,
+  tokenUsedAt: Date | undefined,
+  graceStartedAt: Date | undefined,
+): string => {
+  const bal = user.balance;
+  const name = user.firstName + (user.username ? ` (@${user.username})` : "");
+
+  const hoursLeft  = hourlyCost > 0 ? Math.floor(bal / hourlyCost) : Infinity;
+  const daysLeft   = hourlyCost > 0 ? Math.floor(bal / (hourlyCost * 24)) : Infinity;
+  const hoursStr   = hourlyCost === 0
+    ? "—"
+    : hoursLeft === Infinity
+      ? "∞"
+      : `${hoursLeft} ساعت (${daysLeft} روز)`;
+
+  const statusEmoji: Record<string, string> = {
+    active: "✅", grace: "⏳", expired: "❌", none: "➖",
+  };
+  const statusLabel: Record<string, string> = {
+    active: "فعال", grace: "در دوره گریس", expired: "منقضی", none: "بدون توکن",
+  };
+
+  let graceInfo = "";
+  if (tokenStatus === "grace" && graceStartedAt) {
+    const graceAge  = Date.now() - graceStartedAt.getTime();
+    const daysInGrace = Math.floor(graceAge / (24 * 60 * 60 * 1000));
+    const daysRemaining = Math.max(0, 10 - daysInGrace);
+    graceInfo = `\n⏰ وارد گریس: ${graceStartedAt.toLocaleDateString("fa-IR")}\n` +
+                `🔴 روزهای باقی‌مانده در گریس: *${daysRemaining} روز*`;
+  }
+
+  let usageDuration = "";
+  if (tokenUsedAt) {
+    const ms   = Date.now() - tokenUsedAt.getTime();
+    const days = Math.floor(ms / (24 * 60 * 60 * 1000));
+    const hours = Math.floor((ms % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
+    usageDuration = `\n📆 مدت استفاده از توکن: *${days} روز و ${hours} ساعت*`;
+    if (hourlyCost > 0) {
+      const totalDeducted = Math.floor(ms / (60 * 60 * 1000)) * hourlyCost;
+      usageDuration += `\n💸 برآورد کسر شده: *${totalDeducted.toLocaleString("fa-IR")} تومان*`;
+    }
+  }
+
+  return `📊 *داشبورد بیلینگ کاربر*\n\n` +
+    `━━━━━━━━━━━━━━━━━\n` +
+    `👤 *${name}*\n` +
+    `🆔 شناسه: \`${user.id}\`\n\n` +
+    `━━━━━━━━━━━━━━━━━\n` +
+    `💎 موجودی کیف پول: *${bal.toLocaleString("fa-IR")} تومان*\n` +
+    `⏰ هزینه ساعتی: *${hourlyCost > 0 ? hourlyCost.toLocaleString("fa-IR") + " تومان" : "تنظیم نشده"}*\n` +
+    `⌛️ موجودی باقی‌مانده: *${hoursStr}*\n\n` +
+    `━━━━━━━━━━━━━━━━━\n` +
+    `🔑 توکن: ${tokenCode ? `\`${tokenCode}\`` : "—"}\n` +
+    `${statusEmoji[tokenStatus]} وضعیت: *${statusLabel[tokenStatus]}*` +
+    graceInfo + usageDuration;
+};
