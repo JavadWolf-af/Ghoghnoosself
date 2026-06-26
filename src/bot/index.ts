@@ -229,10 +229,12 @@ async function notifyAdminsDeposit(
   const caption = ADMIN_DEPOSIT_REVIEW(requestId, amount, userId, firstName, username);
   for (const adminId of ADMIN_IDS) {
     try {
-      await bot.sendPhoto(adminId, receiptFileId, {
+      const sent = await bot.sendPhoto(adminId, receiptFileId, {
         caption, parse_mode: "Markdown",
         reply_markup: depositReviewKeyboard(requestId, userId),
       });
+      const existing = lastPanelMsgs.get(adminId) ?? [];
+      lastPanelMsgs.set(adminId, [...existing, sent.message_id]);
     } catch (err) { logger.warn({ adminId, err }, "Failed to notify admin of deposit"); }
   }
 }
@@ -245,10 +247,11 @@ async function notifyAdminsTicket(
     ? ADMIN_TICKET_FOLLOWUP(ticketId, userId, firstName, username, text)
     : ADMIN_NEW_TICKET(ticketId, userId, firstName, username, text);
   for (const adminId of ADMIN_IDS) {
-    await safeSend(
-      () => bot.sendMessage(adminId, msgText, { parse_mode: "Markdown", reply_markup: ticketKeyboard(ticketId) }),
-      `ticket:${adminId}`
-    );
+    try {
+      const sent = await bot.sendMessage(adminId, msgText, { parse_mode: "Markdown", reply_markup: ticketKeyboard(ticketId) });
+      const existing = lastPanelMsgs.get(adminId) ?? [];
+      lastPanelMsgs.set(adminId, [...existing, sent.message_id]);
+    } catch { /* ignore */ }
   }
 }
 
@@ -318,8 +321,8 @@ bot.on("callback_query", async (query) => {
       await sendTracked(chatId, ADMIN_TICKET_ALREADY_CLOSED(ticketId), { parse_mode: "Markdown" });
       return;
     }
-    setAdminTicketTarget(adminId, ticketId);
     setPending(adminId, "ticketReply");
+    setAdminTicketTarget(adminId, ticketId);
     await sendPanel(chatId, ADMIN_TICKET_REPLY_PROMPT(ticketId), { parse_mode: "Markdown", reply_markup: backKeyboard() });
     return;
   }
@@ -377,8 +380,8 @@ bot.on("callback_query", async (query) => {
 
   if (data.startsWith("dep_msg:")) {
     const targetUserId = parseInt(data.replace("dep_msg:", ""), 10);
-    setAdminMessageTarget(adminId, targetUserId);
     setPending(adminId, "adminMessageUser");
+    setAdminMessageTarget(adminId, targetUserId);
     await sendPanel(chatId, ADMIN_MSG_PROMPT(), { parse_mode: "Markdown", reply_markup: backKeyboard() });
     return;
   }
@@ -531,8 +534,8 @@ bot.on("message", async (msg) => {
           await sendTracked(chatId, ADMIN_USER_NOT_FOUND(), { parse_mode: "Markdown" });
           return;
         }
-        setAdminBalanceTarget(userId, targetId);
         setPending(userId, "adminAddBalanceAmount");
+        setAdminBalanceTarget(userId, targetId);
         await sendPanel(chatId, ADMIN_ADD_BALANCE_AMOUNT_PROMPT(targetUser.firstName), { parse_mode: "Markdown", reply_markup: backKeyboard() });
         return;
       }

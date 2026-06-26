@@ -354,7 +354,7 @@ export function getTicketsNeedingReminder(thresholdMs: number): SupportTicket[] 
     if (ticket.status !== "open") continue;
     if (ticket.messages.length === 0) continue;
     const lastMsg = ticket.messages[ticket.messages.length - 1]!;
-    if (lastMsg.sender !== "user") continue;
+    if (lastMsg.from !== "user") continue;
     const timeSinceLastMsg = now - lastMsg.at.getTime();
     if (timeSinceLastMsg < thresholdMs) continue;
     // اگر قبلاً یادآوری فرستاده شده، تا یک بازه دیگر صبر می‌کنیم
