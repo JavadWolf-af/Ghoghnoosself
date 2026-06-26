@@ -55,8 +55,8 @@ const CHANNEL_URL         = process.env["CHANNEL_URL"] || "https://t.me/Ghoghnoo
 const ADMIN_IDS           = (process.env["ADMIN_IDS"] || "")
   .split(",").filter(Boolean).map((id) => parseInt(id.trim(), 10));
 const REMINDER_HOURS      = parseInt(process.env["TICKET_REMINDER_HOURS"] ?? "2", 10);
-const REMINDER_THRESHOLD  = REMINDER_HOURS * 60 * 60 * 1000; // ms
-const CHECK_INTERVAL_MS   = 30 * 60 * 1000; // هر ۳۰ دقیقه یک‌بار چک می‌کند
+const REMINDER_THRESHOLD  = REMINDER_HOURS * 60 * 60 * 1000;
+const CHECK_INTERVAL_MS   = 30 * 60 * 1000;
 
 if (!BOT_TOKEN) throw new Error("TELEGRAM_BOT_TOKEN is required");
 
@@ -68,7 +68,6 @@ const bot = new TelegramBot(BOT_TOKEN, {
   },
 });
 
-// دستور /start همیشه در منوی دستورات ربات نمایش داده می‌شود
 bot.setMyCommands([
   { command: "start", description: "🏠 شروع / بازگشت به منوی اصلی" },
 ]).catch((err) => logger.warn({ err }, "Failed to set bot commands"));
@@ -82,9 +81,9 @@ async function checkUnansweredTickets(): Promise<void> {
   if (tickets.length === 0) return;
   logger.info({ count: tickets.length }, "Sending ticket reminders");
   for (const ticket of tickets) {
-    const user     = getUser(ticket.userId);
-    const lastMsg  = ticket.messages[ticket.messages.length - 1]!;
-    const msgText  = ADMIN_TICKET_REMINDER(
+    const user    = getUser(ticket.userId);
+    const lastMsg = ticket.messages[ticket.messages.length - 1]!;
+    const msgText = ADMIN_TICKET_REMINDER(
       ticket.id, ticket.userId,
       user?.firstName ?? String(ticket.userId),
       user?.username,
@@ -92,18 +91,15 @@ async function checkUnansweredTickets(): Promise<void> {
       REMINDER_HOURS,
     );
     for (const adminId of ADMIN_IDS) {
-      await safeSend(
-        () => bot.sendMessage(adminId, msgText, { parse_mode: "Markdown", reply_markup: ticketKeyboard(ticket.id) }),
-        `reminder:${adminId}:${ticket.id}`
-      );
+      try {
+        await bot.sendMessage(adminId, msgText, { parse_mode: "Markdown", reply_markup: ticketKeyboard(ticket.id) });
+      } catch { /* ignore */ }
     }
     markTicketReminded(ticket.id);
-    // استراحت کوتاه بین تیکت‌ها تا از flood محافظت شود
     await new Promise((r) => setTimeout(r, 100));
   }
 }
 
-// اولین چک بعد از ۵ دقیقه (پس از راه‌اندازی)، سپس هر CHECK_INTERVAL_MS
 setTimeout(() => {
   checkUnansweredTickets().catch((err) => logger.error({ err }, "Reminder check error"));
   setInterval(() => {
@@ -111,17 +107,20 @@ setTimeout(() => {
   }, CHECK_INTERVAL_MS);
 }, 5 * 60 * 1000);
 
-// ── ردیابی آخرین پیام پنل برای حذف پیش از نمایش پنل جدید ──────────────────
-const lastPanelMsg = new Map<number, number>(); // chatId → msgId
+// ── ردیابی همه پیام‌های یک «پنل» برای حذف کامل پیش از نمایش پنل جدید ────────
+// از Map<chatId, number[]> به‌جای Map<chatId, number> استفاده می‌کنیم تا
+// پیام‌های ثانویه (مثلاً آمار بعد از پنل manage) هم حذف شوند.
+const lastPanelMsgs = new Map<number, number[]>();
 
 async function deleteLastPanel(chatId: number): Promise<void> {
-  const msgId = lastPanelMsg.get(chatId);
-  if (msgId) {
+  const ids = lastPanelMsgs.get(chatId) ?? [];
+  for (const msgId of ids) {
     try { await bot.deleteMessage(chatId, msgId); } catch { /* ممکن است قبلاً حذف شده باشد */ }
-    lastPanelMsg.delete(chatId);
   }
+  lastPanelMsgs.delete(chatId);
 }
 
+/** ارسال پنل اصلی — پنل قبلی (همه پیام‌های آن) حذف و پیام جدید ردیابی می‌شود */
 async function sendPanel(
   chatId: number,
   text: string,
@@ -130,7 +129,7 @@ async function sendPanel(
   await deleteLastPanel(chatId);
   try {
     const sent = await bot.sendMessage(chatId, text, options);
-    lastPanelMsg.set(chatId, sent.message_id);
+    lastPanelMsgs.set(chatId, [sent.message_id]);
   } catch (err: unknown) {
     const errMsg = (err as { message?: string })?.message ?? "";
     if (errMsg.includes("Too Many Requests")) {
@@ -138,11 +137,39 @@ async function sendPanel(
       await new Promise((r) => setTimeout(r, wait));
       try {
         const sent = await bot.sendMessage(chatId, text, options);
-        lastPanelMsg.set(chatId, sent.message_id);
+        lastPanelMsgs.set(chatId, [sent.message_id]);
       } catch { /* ignore */ }
     } else if (!errMsg.includes("blocked") && !errMsg.includes("deactivated") && !errMsg.includes("chat not found")) {
       logger.error({ err, chatId }, "sendPanel error");
     }
+  }
+}
+
+/**
+ * ارسال پیام ثانوی به همان چت و اضافه کردن آیدی آن به لیست ردیابی.
+ * هنگام باز شدن پنل بعدی این پیام هم حذف خواهد شد.
+ */
+async function sendTracked(
+  chatId: number,
+  text: string,
+  options?: TelegramBot.SendMessageOptions
+): Promise<void> {
+  try {
+    const sent = await bot.sendMessage(chatId, text, options ?? {});
+    const existing = lastPanelMsgs.get(chatId) ?? [];
+    lastPanelMsgs.set(chatId, [...existing, sent.message_id]);
+  } catch (err: unknown) {
+    const errMsg = (err as { message?: string })?.message ?? "";
+    if (errMsg.includes("Too Many Requests")) {
+      const wait = parseInt(errMsg.match(/retry after (\d+)/)?.[1] ?? "5") * 1000;
+      await new Promise((r) => setTimeout(r, wait));
+      try {
+        const sent = await bot.sendMessage(chatId, text, options ?? {});
+        const existing = lastPanelMsgs.get(chatId) ?? [];
+        lastPanelMsgs.set(chatId, [...existing, sent.message_id]);
+      } catch { /* ignore */ }
+    }
+    // بدون لاگ برای کاربران بلاک/غیرفعال
   }
 }
 
@@ -162,7 +189,6 @@ async function safeSend(fn: () => Promise<unknown>, ctx: string): Promise<boolea
 
 function isAdmin(userId: number): boolean { return ADMIN_IDS.includes(userId); }
 
-// رفع باگ ۱: در صورت خطای API عضویت، false برمی‌گردانیم نه true
 async function isMember(userId: number): Promise<{ member: boolean; failed: boolean }> {
   try {
     const m = await bot.getChatMember(CHANNEL_USERNAME, userId);
@@ -284,9 +310,12 @@ bot.on("callback_query", async (query) => {
   if (data.startsWith("tkt_reply:")) {
     const ticketId = data.replace("tkt_reply:", "");
     const ticket   = getSupportTicket(ticketId);
-    if (!ticket) { await bot.sendMessage(chatId, "⚠️ تیکت پیدا نشد."); return; }
+    if (!ticket) {
+      await sendTracked(chatId, "⚠️ تیکت پیدا نشد.");
+      return;
+    }
     if (ticket.status === "closed") {
-      await bot.sendMessage(chatId, ADMIN_TICKET_ALREADY_CLOSED(ticketId), { parse_mode: "Markdown" });
+      await sendTracked(chatId, ADMIN_TICKET_ALREADY_CLOSED(ticketId), { parse_mode: "Markdown" });
       return;
     }
     setAdminTicketTarget(adminId, ticketId);
@@ -299,9 +328,12 @@ bot.on("callback_query", async (query) => {
   if (data.startsWith("tkt_close:")) {
     const ticketId = data.replace("tkt_close:", "");
     const ticket   = getSupportTicket(ticketId);
-    if (!ticket) { await bot.sendMessage(chatId, "⚠️ تیکت پیدا نشد."); return; }
+    if (!ticket) {
+      await sendTracked(chatId, "⚠️ تیکت پیدا نشد.");
+      return;
+    }
     if (!closeSupportTicket(ticketId)) {
-      await bot.sendMessage(chatId, ADMIN_TICKET_ALREADY_CLOSED(ticketId), { parse_mode: "Markdown" });
+      await sendTracked(chatId, ADMIN_TICKET_ALREADY_CLOSED(ticketId), { parse_mode: "Markdown" });
       return;
     }
     await safeSend(
@@ -309,7 +341,7 @@ bot.on("callback_query", async (query) => {
       `ticketClose:${ticket.userId}`
     );
     if (msgId) await bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: msgId }).catch(() => {});
-    await safeSend(() => bot.sendMessage(chatId, ADMIN_TICKET_CLOSED(ticketId), { parse_mode: "Markdown" }), `tktClose:${chatId}`);
+    await sendTracked(chatId, ADMIN_TICKET_CLOSED(ticketId), { parse_mode: "Markdown" });
     return;
   }
 
@@ -317,7 +349,10 @@ bot.on("callback_query", async (query) => {
   if (data.startsWith("dep_approve:")) {
     const requestId = data.replace("dep_approve:", "");
     const result    = approveBalanceRequest(requestId);
-    if (!result.ok) { await bot.sendMessage(chatId, "⚠️ این درخواست قبلاً پردازش شده است."); return; }
+    if (!result.ok) {
+      await sendTracked(chatId, "⚠️ این درخواست قبلاً پردازش شده است.");
+      return;
+    }
     const newBalance = getUserBalance(result.userId!);
     await safeSend(
       () => bot.sendMessage(result.userId!, BALANCE_APPROVED_USER(result.amount!, newBalance), { parse_mode: "Markdown", reply_markup: userMainKeyboard() }),
@@ -331,7 +366,10 @@ bot.on("callback_query", async (query) => {
     const requestId = data.replace("dep_reject:", "");
     const req = getBalanceRequest(requestId);
     const ok  = rejectBalanceRequest(requestId);
-    if (!ok) { await bot.sendMessage(chatId, "⚠️ این درخواست قبلاً پردازش شده است."); return; }
+    if (!ok) {
+      await sendTracked(chatId, "⚠️ این درخواست قبلاً پردازش شده است.");
+      return;
+    }
     if (req) await safeSend(() => bot.sendMessage(req.userId, BALANCE_REJECTED_USER(), { parse_mode: "Markdown", reply_markup: walletKeyboard() }), `reject:${req.userId}`);
     if (msgId) await bot.editMessageCaption(ADMIN_DEPOSIT_REJECTED(requestId), { chat_id: chatId, message_id: msgId, parse_mode: "Markdown" }).catch(() => {});
     return;
@@ -350,7 +388,7 @@ bot.on("callback_query", async (query) => {
     blockUser(targetUserId);
     const targetUser = getUser(targetUserId);
     await safeSend(() => bot.sendMessage(targetUserId, BLOCKED_MESSAGE(), { parse_mode: "Markdown", reply_markup: blockedKeyboard() }), `block:${targetUserId}`);
-    await bot.sendMessage(chatId, ADMIN_USER_BLOCKED(targetUser?.firstName ?? String(targetUserId), targetUserId), { parse_mode: "Markdown", reply_markup: unblockKeyboard(targetUserId) });
+    await sendTracked(chatId, ADMIN_USER_BLOCKED(targetUser?.firstName ?? String(targetUserId), targetUserId), { parse_mode: "Markdown", reply_markup: unblockKeyboard(targetUserId) });
     return;
   }
 
@@ -360,7 +398,7 @@ bot.on("callback_query", async (query) => {
     const targetUser = getUser(targetUserId);
     await safeSend(() => bot.sendMessage(targetUserId, UNBLOCKED_MESSAGE(), { parse_mode: "Markdown", reply_markup: userMainKeyboard() }), `unblock:${targetUserId}`);
     if (msgId) await bot.editMessageReplyMarkup({ inline_keyboard: [] }, { chat_id: chatId, message_id: msgId }).catch(() => {});
-    await bot.sendMessage(chatId, ADMIN_USER_UNBLOCKED(targetUser?.firstName ?? String(targetUserId), targetUserId), { parse_mode: "Markdown", reply_markup: adminManageKeyboard() });
+    await sendTracked(chatId, ADMIN_USER_UNBLOCKED(targetUser?.firstName ?? String(targetUserId), targetUserId), { parse_mode: "Markdown", reply_markup: adminManageKeyboard() });
     return;
   }
 });
@@ -377,10 +415,7 @@ bot.on("photo", async (msg) => {
 
     const balanceData = getAddBalanceData(userId);
     if (!balanceData) {
-      await safeSend(
-        () => bot.sendMessage(chatId, "⚠️ ابتدا مبلغ واریز را وارد کنید.", { parse_mode: "Markdown", reply_markup: backKeyboard() }),
-        `noData:${chatId}`
-      );
+      await sendTracked(chatId, "⚠️ ابتدا مبلغ واریز را وارد کنید.", { parse_mode: "Markdown", reply_markup: backKeyboard() });
       return;
     }
     clearAllPending(userId);
@@ -436,7 +471,7 @@ bot.on("message", async (msg) => {
         const ticket = getSupportTicket(ticketId);
         if (!ticket || ticket.status === "closed") {
           await sendAdminManage(chatId);
-          await safeSend(() => bot.sendMessage(chatId, ADMIN_TICKET_ALREADY_CLOSED(ticketId), { parse_mode: "Markdown" }), `tktReply:${chatId}`);
+          await sendTracked(chatId, ADMIN_TICKET_ALREADY_CLOSED(ticketId), { parse_mode: "Markdown" });
           return;
         }
         addTicketMessage(ticketId, "admin", text);
@@ -445,7 +480,7 @@ bot.on("message", async (msg) => {
           `tktUser:${ticket.userId}`
         );
         await sendAdminManage(chatId);
-        await safeSend(() => bot.sendMessage(chatId, ADMIN_TICKET_REPLY_SENT(ticketId), { parse_mode: "Markdown" }), `tktDone:${chatId}`);
+        await sendTracked(chatId, ADMIN_TICKET_REPLY_SENT(ticketId), { parse_mode: "Markdown" });
         return;
       }
 
@@ -459,7 +494,7 @@ bot.on("message", async (msg) => {
           await new Promise((r) => setTimeout(r, 50));
         }
         await sendAdminManage(chatId);
-        await safeSend(() => bot.sendMessage(chatId, BROADCAST_SENT(sent), { parse_mode: "Markdown" }), `bcDone:${chatId}`);
+        await sendTracked(chatId, BROADCAST_SENT(sent), { parse_mode: "Markdown" });
         return;
       }
 
@@ -467,7 +502,7 @@ bot.on("message", async (msg) => {
         clearAllPending(userId);
         setCardNumber(text.trim());
         await sendAdminManage(chatId);
-        await safeSend(() => bot.sendMessage(chatId, CARD_NUMBER_SET(text.trim()), { parse_mode: "Markdown" }), `card:${chatId}`);
+        await sendTracked(chatId, CARD_NUMBER_SET(text.trim()), { parse_mode: "Markdown" });
         return;
       }
 
@@ -477,7 +512,7 @@ bot.on("message", async (msg) => {
         if (targetUserId !== undefined)
           await safeSend(() => bot.sendMessage(targetUserId, `📨 *پیام از پشتیبانی:*\n\n${text}`, { parse_mode: "Markdown" }), `msgUser:${targetUserId}`);
         await sendAdminManage(chatId);
-        await safeSend(() => bot.sendMessage(chatId, ADMIN_MSG_SENT(), { parse_mode: "Markdown" }), `msgDone:${chatId}`);
+        await sendTracked(chatId, ADMIN_MSG_SENT(), { parse_mode: "Markdown" });
         return;
       }
 
@@ -486,14 +521,14 @@ bot.on("message", async (msg) => {
         if (isNaN(targetId)) {
           clearAllPending(userId);
           await sendAdminManage(chatId);
-          await safeSend(() => bot.sendMessage(chatId, ADMIN_INVALID_ID(), { parse_mode: "Markdown" }), `invalidId:${chatId}`);
+          await sendTracked(chatId, ADMIN_INVALID_ID(), { parse_mode: "Markdown" });
           return;
         }
         const targetUser = getUser(targetId);
         if (!targetUser) {
           clearAllPending(userId);
           await sendAdminManage(chatId);
-          await safeSend(() => bot.sendMessage(chatId, ADMIN_USER_NOT_FOUND(), { parse_mode: "Markdown" }), `notFound:${chatId}`);
+          await sendTracked(chatId, ADMIN_USER_NOT_FOUND(), { parse_mode: "Markdown" });
           return;
         }
         setAdminBalanceTarget(userId, targetId);
@@ -509,7 +544,7 @@ bot.on("message", async (msg) => {
         const amount = parseInt(text.trim().replace(/\D/g, ""), 10);
         if (!amount || amount <= 0) {
           await sendAdminManage(chatId);
-          await safeSend(() => bot.sendMessage(chatId, "❌ مبلغ نامعتبر است.", { parse_mode: "Markdown" }), `badAmount:${chatId}`);
+          await sendTracked(chatId, "❌ مبلغ نامعتبر است.", { parse_mode: "Markdown" });
           return;
         }
         addBalance(targetId, amount);
@@ -520,7 +555,7 @@ bot.on("message", async (msg) => {
           `notify:${targetId}`
         );
         await sendAdminManage(chatId);
-        await safeSend(() => bot.sendMessage(chatId, ADMIN_BALANCE_ADDED(targetUser.firstName, targetId, amount), { parse_mode: "Markdown" }), `added:${chatId}`);
+        await sendTracked(chatId, ADMIN_BALANCE_ADDED(targetUser.firstName, targetId, amount), { parse_mode: "Markdown" });
         return;
       }
 
@@ -529,7 +564,7 @@ bot.on("message", async (msg) => {
         const parts = text.trim().split(/\s+/);
         if (parts.length !== 3) {
           await sendAdminManage(chatId);
-          await safeSend(() => bot.sendMessage(chatId, TRANSFER_FAILED("invalid_format"), { parse_mode: "Markdown" }), `atr:${chatId}`);
+          await sendTracked(chatId, TRANSFER_FAILED("invalid_format"), { parse_mode: "Markdown" });
           return;
         }
         const fromId = parseInt(parts[0]!, 10);
@@ -537,14 +572,15 @@ bot.on("message", async (msg) => {
         const amount = parseInt(parts[2]!, 10);
         if (isNaN(fromId) || isNaN(toId) || isNaN(amount) || amount <= 0) {
           await sendAdminManage(chatId);
-          await safeSend(() => bot.sendMessage(chatId, TRANSFER_FAILED("invalid_amount"), { parse_mode: "Markdown" }), `atr:${chatId}`);
+          await sendTracked(chatId, TRANSFER_FAILED("invalid_amount"), { parse_mode: "Markdown" });
           return;
         }
         const result = transferBalance(fromId, toId, amount);
         await sendAdminManage(chatId);
-        await safeSend(
-          () => bot.sendMessage(chatId, result.ok ? ADMIN_TRANSFER_SUCCESS(fromId, toId, amount) : TRANSFER_FAILED(result.reason ?? "unknown"), { parse_mode: "Markdown" }),
-          `atr:${chatId}`
+        await sendTracked(
+          chatId,
+          result.ok ? ADMIN_TRANSFER_SUCCESS(fromId, toId, amount) : TRANSFER_FAILED(result.reason ?? "unknown"),
+          { parse_mode: "Markdown" }
         );
         return;
       }
@@ -554,9 +590,10 @@ bot.on("message", async (msg) => {
 
       if (text === MANAGE_BUTTONS.STATS) {
         await sendAdminManage(chatId);
-        await safeSend(
-          () => bot.sendMessage(chatId, STATS_MESSAGE(getUserCount(), getTokenCount(), getUnusedTokenCount(), getOpenTicketsCount()), { parse_mode: "Markdown" }),
-          `stats:${chatId}`
+        await sendTracked(
+          chatId,
+          STATS_MESSAGE(getUserCount(), getTokenCount(), getUnusedTokenCount(), getOpenTicketsCount()),
+          { parse_mode: "Markdown" }
         );
         return;
       }
@@ -568,7 +605,7 @@ bot.on("message", async (msg) => {
       if (text === MANAGE_BUTTONS.ADD_TOKEN) {
         const code = createToken(userId);
         await sendAdminManage(chatId);
-        await safeSend(() => bot.sendMessage(chatId, TOKEN_CREATED_MESSAGE(code), { parse_mode: "Markdown" }), `addToken:${chatId}`);
+        await sendTracked(chatId, TOKEN_CREATED_MESSAGE(code), { parse_mode: "Markdown" });
         return;
       }
       if (text === MANAGE_BUTTONS.CARD_NUMBER) {
@@ -589,11 +626,12 @@ bot.on("message", async (msg) => {
       if (text === MANAGE_BUTTONS.BLOCKED_LIST) {
         const blockedUsers = getBlockedUsers();
         await sendAdminManage(chatId);
-        await safeSend(() => bot.sendMessage(chatId, BLOCKED_LIST_MESSAGE(blockedUsers), { parse_mode: "Markdown" }), `blockedList:${chatId}`);
+        await sendTracked(chatId, BLOCKED_LIST_MESSAGE(blockedUsers), { parse_mode: "Markdown" });
         for (const u of blockedUsers) {
-          await safeSend(
-            () => bot.sendMessage(chatId, `👤 *${u.firstName}*${u.username ? ` (@${u.username})` : ""} — \`${u.id}\``, { parse_mode: "Markdown", reply_markup: unblockKeyboard(u.id) }),
-            `unblockBtn:${u.id}`
+          await sendTracked(
+            chatId,
+            `👤 *${u.firstName}*${u.username ? ` (@${u.username})` : ""} — \`${u.id}\``,
+            { parse_mode: "Markdown", reply_markup: unblockKeyboard(u.id) }
           );
         }
         return;
@@ -614,14 +652,14 @@ bot.on("message", async (msg) => {
             `blockedSupport:${adminId}`
           );
         }
-        await safeSend(() => bot.sendMessage(chatId, BLOCKED_SUPPORT_SENT(), { parse_mode: "Markdown", reply_markup: blockedKeyboard() }), `blockedSent:${chatId}`);
+        await sendTracked(chatId, BLOCKED_SUPPORT_SENT(), { parse_mode: "Markdown", reply_markup: blockedKeyboard() });
         return;
       }
       if (text === USER_BUTTONS.SUPPORT) {
         setPending(userId, "blockedSupport");
-        await safeSend(() => bot.sendMessage(chatId, BLOCKED_SUPPORT_PROMPT(), { parse_mode: "Markdown", reply_markup: blockedKeyboard() }), `blockedPrompt:${chatId}`);
+        await sendTracked(chatId, BLOCKED_SUPPORT_PROMPT(), { parse_mode: "Markdown", reply_markup: blockedKeyboard() });
       } else {
-        await safeSend(() => bot.sendMessage(chatId, BLOCKED_ONLY_SUPPORT(), { parse_mode: "Markdown", reply_markup: blockedKeyboard() }), `blockedOnly:${chatId}`);
+        await sendTracked(chatId, BLOCKED_ONLY_SUPPORT(), { parse_mode: "Markdown", reply_markup: blockedKeyboard() });
       }
       return;
     }
@@ -651,7 +689,6 @@ bot.on("message", async (msg) => {
       clearAllPending(userId);
       const user = getUser(userId);
 
-      // بررسی تیکت باز موجود — اگر بود، پیام را به همان تیکت اضافه می‌کنیم
       const existingTicket = getOpenTicketByUser(userId);
       if (existingTicket) {
         addTicketMessage(existingTicket.id, "user", text);
@@ -667,15 +704,12 @@ bot.on("message", async (msg) => {
 
     if (isPending(userId, "addBalance")) {
       if (getAddBalanceData(userId)) {
-        await safeSend(
-          () => bot.sendMessage(chatId, "📸 لطفاً تصویر رسید واریز را ارسال کنید.\nبرای لغو 🔙 را بزنید.", { parse_mode: "Markdown", reply_markup: backKeyboard() }),
-          `waitPhoto:${chatId}`
-        );
+        await sendTracked(chatId, "📸 لطفاً تصویر رسید واریز را ارسال کنید.\nبرای لغو 🔙 را بزنید.", { parse_mode: "Markdown", reply_markup: backKeyboard() });
         return;
       }
       const amount = parseInt(text.replace(/\D/g, ""), 10);
       if (!amount || amount <= 0) {
-        await safeSend(() => bot.sendMessage(chatId, "❌ مبلغ نامعتبر است. یک عدد صحیح وارد کنید.", { parse_mode: "Markdown", reply_markup: backKeyboard() }), `badAmount:${chatId}`);
+        await sendTracked(chatId, "❌ مبلغ نامعتبر است. یک عدد صحیح وارد کنید.", { parse_mode: "Markdown", reply_markup: backKeyboard() });
         return;
       }
       const receiptId = Math.random().toString(36).slice(2, 10).toUpperCase();
@@ -726,7 +760,7 @@ bot.on("message", async (msg) => {
     if (text === WALLET_BUTTONS.TRANSFER) {
       if (getUserBalance(userId) <= 0) {
         await sendWallet(chatId, userId);
-        await safeSend(() => bot.sendMessage(chatId, "❌ موجودی کافی ندارید.", { parse_mode: "Markdown" }), `noBalance:${chatId}`);
+        await sendTracked(chatId, "❌ موجودی کافی ندارید.", { parse_mode: "Markdown" });
         return;
       }
       setPending(userId, "transferInput");
