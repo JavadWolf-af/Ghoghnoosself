@@ -6,11 +6,12 @@ import type {
 export const BACK_BUTTON = "🔙 بازگشت";
 
 export const USER_BUTTONS = {
-  WALLET:   "💎 کیف پول",
-  REFERRAL: "🔗 دعوت از دوستان",
-  PROFILE:  "👤 پروفایل",
-  SUPPORT:  "🎧 پشتیبانی",
-  TOKEN:    "🔑 فعال‌سازی توکن",
+  WALLET:       "💎 کیف پول",
+  REFERRAL:     "🔗 دعوت از دوستان",
+  PROFILE:      "👤 پروفایل",
+  SUPPORT:      "🎧 پشتیبانی",
+  OPEN_TICKETS: "🎫 تیکت‌های باز",
+  TOKEN:        "🔑 فعال‌سازی توکن",
 };
 
 export const WALLET_BUTTONS = {
@@ -31,6 +32,7 @@ export const MANAGE_BUTTONS = {
   CARD_NUMBER:   "💳 شماره کارت",
   ADD_BALANCE:   "💰 افزودن موجودی",
   TRANSFER_USER: "↔️ انتقال اعتبار",
+  OPEN_TICKETS:  "🎫 تیکت‌های باز",
   BLOCKED_LIST:  "🚫 لیست مسدودها",
   BACK:          BACK_BUTTON,
 };
@@ -39,9 +41,9 @@ export const MANAGE_BUTTONS = {
 
 export const userMainKeyboard = (): ReplyKeyboardMarkup => ({
   keyboard: [
-    [{ text: USER_BUTTONS.WALLET },  { text: USER_BUTTONS.REFERRAL }],
-    [{ text: USER_BUTTONS.PROFILE }, { text: USER_BUTTONS.SUPPORT }],
-    [{ text: USER_BUTTONS.TOKEN }],
+    [{ text: USER_BUTTONS.WALLET },        { text: USER_BUTTONS.REFERRAL }],
+    [{ text: USER_BUTTONS.PROFILE },       { text: USER_BUTTONS.SUPPORT }],
+    [{ text: USER_BUTTONS.OPEN_TICKETS },  { text: USER_BUTTONS.TOKEN }],
   ],
   resize_keyboard: true,
 });
@@ -84,10 +86,10 @@ export const adminMainKeyboard = (): ReplyKeyboardMarkup => ({
 
 export const adminManageKeyboard = (): ReplyKeyboardMarkup => ({
   keyboard: [
-    [{ text: MANAGE_BUTTONS.STATS },        { text: MANAGE_BUTTONS.BROADCAST }],
-    [{ text: MANAGE_BUTTONS.ADD_TOKEN },    { text: MANAGE_BUTTONS.CARD_NUMBER }],
-    [{ text: MANAGE_BUTTONS.ADD_BALANCE },  { text: MANAGE_BUTTONS.TRANSFER_USER }],
-    [{ text: MANAGE_BUTTONS.BLOCKED_LIST }],
+    [{ text: MANAGE_BUTTONS.STATS },         { text: MANAGE_BUTTONS.BROADCAST }],
+    [{ text: MANAGE_BUTTONS.ADD_TOKEN },     { text: MANAGE_BUTTONS.CARD_NUMBER }],
+    [{ text: MANAGE_BUTTONS.ADD_BALANCE },   { text: MANAGE_BUTTONS.TRANSFER_USER }],
+    [{ text: MANAGE_BUTTONS.OPEN_TICKETS },  { text: MANAGE_BUTTONS.BLOCKED_LIST }],
     [{ text: MANAGE_BUTTONS.BACK }],
   ],
   resize_keyboard: true,

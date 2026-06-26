@@ -271,6 +271,12 @@ export function getOpenTicketsCount(): number {
   return Array.from(ticketsMap.values()).filter(t => t.status === "open").length;
 }
 
+export function getAllOpenTickets(): SupportTicket[] {
+  return Array.from(ticketsMap.values())
+    .filter(t => t.status === "open")
+    .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+}
+
 // ── Card Number ───────────────────────────────────────────────────────────────
 export function setCardNumber(card: string): void { cardNumber = card; saveData(); }
 export function getCardNumber(): string { return cardNumber; }

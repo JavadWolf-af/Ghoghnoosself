@@ -379,6 +379,73 @@ export const ADMIN_TRANSFER_SUCCESS = (from: number, to: number, amount: number)
   `✅ *انتقال موفق*\n\n` +
   `*${amount.toLocaleString("fa-IR")} تومان* از \`${from}\` به \`${to}\` منتقل شد.`;
 
+// ── Open Tickets View ─────────────────────────────────────────────────────────
+
+export const USER_NO_OPEN_TICKET = (): string =>
+  `✅ *تیکت باز ندارید*\n\n` +
+  `در حال حاضر هیچ تیکت فعالی ندارید.\n` +
+  `برای تماس با پشتیبانی از دکمه 🎧 استفاده کنید.`;
+
+export const USER_OPEN_TICKET = (
+  ticketId: string,
+  createdAt: Date,
+  messages: Array<{ from: "user" | "admin"; text: string; at: Date }>
+): string => {
+  const SHOW_LAST = 5;
+  const shown  = messages.slice(-SHOW_LAST);
+  const omitted = messages.length - shown.length;
+
+  const msgLines = shown.map(m => {
+    const who = m.from === "user" ? "👤 *شما*" : "🔧 *پشتیبانی*";
+    return `${who}:\n${esc(m.text)}`;
+  }).join("\n\n");
+
+  const prefix = omitted > 0
+    ? `_... ${omitted} پیام قدیمی‌تر ..._\n\n━━━━━━━━━━━━━━━━━\n\n`
+    : "";
+
+  return (
+    `🎫 *تیکت باز شما*\n\n` +
+    `━━━━━━━━━━━━━━━━━\n` +
+    `🆔 شماره: \`${ticketId}\`\n` +
+    `📅 تاریخ: ${createdAt.toLocaleDateString("fa-IR")}\n` +
+    `💬 تعداد پیام: *${messages.length}*\n\n` +
+    `━━━━━━━━━━━━━━━━━\n\n` +
+    prefix + msgLines +
+    `\n\n━━━━━━━━━━━━━━━━━\n` +
+    `برای ارسال پیام جدید از 🎧 *پشتیبانی* استفاده کنید.`
+  );
+};
+
+export const ADMIN_OPEN_TICKETS_HEADER = (count: number): string =>
+  count === 0
+    ? `✅ *هیچ تیکت بازی وجود ندارد*\n\nالان همه چیز آروم‌ه 🙂`
+    : `🎫 *تیکت‌های باز* — ${count} عدد\n\n` +
+      `━━━━━━━━━━━━━━━━━\n` +
+      `به ترتیب قدیمی‌ترین نمایش داده می‌شوند:\n` +
+      `🔴 = آخرین پیام از کاربر (نیاز به پاسخ)`;
+
+export const ADMIN_OPEN_TICKET_ITEM = (
+  ticketId: string,
+  userId: number,
+  firstName: string,
+  username: string | undefined,
+  createdAt: Date,
+  messageCount: number,
+  lastFrom: "user" | "admin",
+  lastText: string,
+): string => {
+  const indicator = lastFrom === "user" ? " 🔴" : " 🟢";
+  const lastBy    = lastFrom === "user" ? "👤 کاربر" : "🔧 ادمین";
+  const preview   = esc(lastText).slice(0, 100) + (lastText.length > 100 ? "…" : "");
+  return (
+    `🎫 \`${ticketId}\`${indicator}\n` +
+    `👤 *${esc(firstName)}*${username ? ` (@${esc(username)})` : ""} — \`${userId}\`\n` +
+    `📅 ${createdAt.toLocaleDateString("fa-IR")} · ${messageCount} پیام\n\n` +
+    `${lastBy}: _${preview}_`
+  );
+};
+
 // ── Ticket Reminder ───────────────────────────────────────────────────────────
 
 export const ADMIN_TICKET_REMINDER = (

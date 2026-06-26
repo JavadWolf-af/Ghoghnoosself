@@ -31,6 +31,8 @@ import {
   ADMIN_USER_BLOCKED, ADMIN_USER_UNBLOCKED,
   ADMIN_TRANSFER_PROMPT, ADMIN_TRANSFER_SUCCESS,
   ADMIN_TICKET_REMINDER,
+  USER_NO_OPEN_TICKET, USER_OPEN_TICKET,
+  ADMIN_OPEN_TICKETS_HEADER, ADMIN_OPEN_TICKET_ITEM,
 } from "./messages";
 import {
   addUser, getUser, getAllUsers, getBlockedUsers, getUserCount,
@@ -39,7 +41,7 @@ import {
   getUserBalance, addBalance, transferBalance,
   createBalanceRequest, getBalanceRequest, approveBalanceRequest, rejectBalanceRequest,
   setCardNumber, getCardNumber,
-  createSupportTicket, getOpenTicketByUser, getSupportTicket,
+  createSupportTicket, getOpenTicketByUser, getSupportTicket, getAllOpenTickets,
   addTicketMessage, closeSupportTicket, getOpenTicketsCount,
   setPending, clearAllPending, isPending, isPendingAdminManage, isPendingWallet,
   setAddBalanceData, getAddBalanceData,
@@ -636,6 +638,31 @@ bot.on("message", async (msg) => {
         }
         return;
       }
+      if (text === MANAGE_BUTTONS.OPEN_TICKETS) {
+        const openTickets = getAllOpenTickets();
+        await sendAdminManage(chatId);
+        await sendTracked(chatId, ADMIN_OPEN_TICKETS_HEADER(openTickets.length), { parse_mode: "Markdown" });
+        for (const ticket of openTickets) {
+          const ticketUser = getUser(ticket.userId);
+          const lastMsg    = ticket.messages[ticket.messages.length - 1]!;
+          await sendTracked(
+            chatId,
+            ADMIN_OPEN_TICKET_ITEM(
+              ticket.id,
+              ticket.userId,
+              ticketUser?.firstName ?? String(ticket.userId),
+              ticketUser?.username,
+              ticket.createdAt,
+              ticket.messages.length,
+              lastMsg.from,
+              lastMsg.text,
+            ),
+            { parse_mode: "Markdown", reply_markup: ticketKeyboard(ticket.id) }
+          );
+          await new Promise((r) => setTimeout(r, 80));
+        }
+        return;
+      }
       return;
     }
 
@@ -782,6 +809,15 @@ bot.on("message", async (msg) => {
     if (text === USER_BUTTONS.SUPPORT) {
       setPending(userId, "support");
       await sendPanel(chatId, SUPPORT_PROMPT(), { parse_mode: "Markdown", reply_markup: backKeyboard() });
+      return;
+    }
+    if (text === USER_BUTTONS.OPEN_TICKETS) {
+      const ticket = getOpenTicketByUser(userId);
+      if (!ticket) {
+        await sendPanel(chatId, USER_NO_OPEN_TICKET(), { parse_mode: "Markdown", reply_markup: userMainKeyboard() });
+      } else {
+        await sendPanel(chatId, USER_OPEN_TICKET(ticket.id, ticket.createdAt, ticket.messages), { parse_mode: "Markdown", reply_markup: userMainKeyboard() });
+      }
       return;
     }
     if (text === USER_BUTTONS.TOKEN) {
