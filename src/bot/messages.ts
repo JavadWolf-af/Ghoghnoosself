@@ -529,32 +529,34 @@ export const ADMIN_TICKET_REMINDER = (
 // ── Token Billing ─────────────────────────────────────────────────────────────
 
 export const ADMIN_TOKEN_COST_MESSAGE = (
-  daily: number, monthly: number, activeCount: number, graceCount: number,
+  hourly: number, activeCount: number, graceCount: number,
 ): string =>
   `🔑 *هزینه توکن*\n\n` +
   `━━━━━━━━━━━━━━━━━\n` +
-  `💵 هزینه روزانه: *${daily > 0 ? daily.toLocaleString("fa-IR") + " تومان" : "تنظیم نشده"}*\n` +
-  `📅 هزینه ماهانه: *${monthly > 0 ? monthly.toLocaleString("fa-IR") + " تومان" : "—"}*\n\n` +
+  `⏰ هزینه ساعتی: *${hourly > 0 ? hourly.toLocaleString("fa-IR") + " تومان" : "تنظیم نشده"}*\n` +
+  `☀️ معادل روزانه: *${hourly > 0 ? (hourly * 24).toLocaleString("fa-IR") + " تومان" : "—"}*\n` +
+  `📅 معادل ماهانه: *${hourly > 0 ? (hourly * 24 * 30).toLocaleString("fa-IR") + " تومان" : "—"}*\n\n` +
   `━━━━━━━━━━━━━━━━━\n` +
   `✅ توکن‌های فعال: *${activeCount}*\n` +
   `⏳ در دوره گریس: *${graceCount}*`;
 
 export const TOKEN_COST_PROMPT = (): string =>
-  `✏️ *تنظیم هزینه روزانه توکن*\n\n` +
+  `✏️ *تنظیم هزینه ساعتی توکن*\n\n` +
   `━━━━━━━━━━━━━━━━━\n` +
-  `هزینه روزانه به *تومان* را وارد کنید:\n\n` +
-  `مثال: \`1000\` (روزی ۱۰۰۰ تومان)\n\n` +
+  `هزینه هر ساعت به *تومان* را وارد کنید:\n\n` +
+  `مثال: \`42\` (ساعتی ۴۲ تومان = روزی ۱۰۰۸ تومان)\n\n` +
   `برای غیرفعال کردن صورتحساب، عدد \`0\` وارد کنید.\n\n` +
   `↩️ برای انصراف 🔙 را بزنید`;
 
-export const TOKEN_COST_SET = (daily: number, monthly: number): string =>
-  daily === 0
+export const TOKEN_COST_SET = (hourly: number): string =>
+  hourly === 0
     ? `✅ *صورتحساب غیرفعال شد*\n\nدیگر هزینه‌ای از کاربران کم نمی‌شود.`
-    : `✅ *هزینه توکن تنظیم شد*\n\n` +
+    : `✅ *هزینه ساعتی توکن تنظیم شد*\n\n` +
       `━━━━━━━━━━━━━━━━━\n` +
-      `💵 روزانه: *${daily.toLocaleString("fa-IR")} تومان*\n` +
-      `📅 ماهانه: *${monthly.toLocaleString("fa-IR")} تومان*\n\n` +
-      `از فردا اعمال می‌شود.`;
+      `⏰ ساعتی: *${hourly.toLocaleString("fa-IR")} تومان*\n` +
+      `☀️ روزانه: *${(hourly * 24).toLocaleString("fa-IR")} تومان*\n` +
+      `📅 ماهانه: *${(hourly * 24 * 30).toLocaleString("fa-IR")} تومان*\n\n` +
+      `از ساعت بعد اعمال می‌شود.`;
 
 export const BALANCE_LOW_WARNING = (daysLeft: number): string =>
   `⚠️ *اعلان کیف پول — موجودی کم*\n\n` +
@@ -618,7 +620,7 @@ export const ADMIN_TOKEN_RESTORED = (firstName: string, userId: number): string 
 export const ADMIN_BILLING_REPORT = (
   billed: number, graceStarted: number, expired: number,
 ): string =>
-  `📊 *گزارش صورتحساب روزانه*\n\n` +
+  `📊 *گزارش صورتحساب ساعتی*\n\n` +
   `━━━━━━━━━━━━━━━━━\n` +
   `✅ کسر موفق: *${billed}* توکن\n` +
   `⏳ وارد گریس شده: *${graceStarted}* توکن\n` +
