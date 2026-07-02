@@ -20,12 +20,17 @@ async function buildAll() {
     outExtension: { ".js": ".mjs" },
     logLevel: "info",
     external: [
+      // native addons
       "*.node",
       "bufferutil",
       "utf-8-validate",
+      // logging
       "pino-pretty",
       "thread-stream",
       "pino/file",
+      // puppeteer must stay external — bundling it hangs esbuild (huge + chrome binary)
+      "puppeteer",
+      "puppeteer-core",
     ],
     sourcemap: "linked",
     banner: {
