@@ -1,6 +1,4 @@
 import TelegramBot from "node-telegram-bot-api";
-import { startPhoneLogin, submitVerificationCode, cancelTgSession } from "./tg-api-fetcher";
-import { loadAllClockJobs, startClockJob, stopClockJob, initiateUserbotAuth, confirmUserbotAuth, cancelUserbotAuth } from "./userbot-manager";
 import { logger } from "../lib/logger";
 import {
   userMainKeyboard, walletKeyboard,
@@ -11,7 +9,6 @@ import {
   ticketKeyboard, unblockKeyboard, adminUserActionKeyboard, userBillingKeyboard,
   broadcastConfirmKeyboard, tokenCostKeyboard, graceTokenRestoreKeyboard,
   tokenManageKeyboard, userManageKeyboard,
-  activatedServicesKeyboard, sharePhoneKeyboard, clockKeyboard,
 } from "./keyboards";
 import {
   WELCOME_MESSAGE, MAIN_MENU_MESSAGE, NOT_MEMBER_MESSAGE, MEMBERSHIP_CHECK_FAILED_MESSAGE,
@@ -20,8 +17,7 @@ import {
   ADMIN_NEW_TICKET, ADMIN_TICKET_FOLLOWUP, ADMIN_TICKET_REPLY_PROMPT,
   ADMIN_TICKET_REPLY_SENT, ADMIN_TICKET_CLOSED, ADMIN_TICKET_ALREADY_CLOSED,
   BLOCKED_SUPPORT_PROMPT, BLOCKED_SUPPORT_SENT, BLOCKED_ONLY_SUPPORT,
-  TOKEN_SECTION_MESSAGE, TOKEN_SUCCESS_MESSAGE, TOKEN_ALREADY_ACTIVATED_MESSAGE,
-  TOKEN_INVALID_MESSAGE, TOKEN_ALREADY_USED_MESSAGE, TOKEN_CREATED_MESSAGE,
+  TOKEN_CREATED_MESSAGE,
   WALLET_MESSAGE, ADD_BALANCE_AMOUNT_PROMPT, ADD_BALANCE_RECEIPT, BALANCE_REQUEST_SENT,
   BALANCE_APPROVED_USER, BALANCE_REJECTED_USER,
   BLOCKED_MESSAGE, UNBLOCKED_MESSAGE,
@@ -46,23 +42,11 @@ import {
   TOKEN_GRACE_STARTED, TOKEN_GRACE_REMINDER, TOKEN_EXPIRED_NOTIFY,
   ADMIN_GRACE_TOKENS_HEADER, ADMIN_GRACE_TOKEN_ITEM, ADMIN_TOKEN_RESTORED,
   ADMIN_BILLING_REPORT,
-  ACTIVATED_SERVICES_MESSAGE,
-  TELEGRAM_LOGIN_PROMPT,
-  TELEGRAM_PHONE_RECEIVED,
-  TELEGRAM_CODE_PROMPT,
-  TELEGRAM_LOGIN_SUCCESS,
-  TELEGRAM_LOGIN_ERROR,
-  TELEGRAM_CODE_INVALID,
-  TELEGRAM_PHONE_ERROR,
-  TELEGRAM_LOGIN_PHONE_PROMPT,
-  TELEGRAM_LOGIN_CODE_PROMPT,
-  CLOCK_PANEL_MESSAGE, CLOCK_AUTH_PROMPT, CLOCK_AUTH_CODE_PROMPT,
-  CLOCK_AUTH_CODE_INVALID, CLOCK_AUTH_SUCCESS, CLOCK_AUTH_ERROR,
 } from "./messages";
 import {
   addUser, getUser, getAllUsers, getBlockedUsers, getUserCount,
-  isUserActivated, isUserBlocked, blockUser, unblockUser,
-  createToken, validateAndUseToken, getTokenCount, getUnusedTokenCount,
+  isUserBlocked, blockUser, unblockUser,
+  createToken, getTokenCount, getUnusedTokenCount,
   getUserBalance, addBalance, transferBalance,
   createBalanceRequest, getBalanceRequest, approveBalanceRequest, rejectBalanceRequest,
   setCardNumber, getCardNumber, setCardHolder, getCardHolder, setCardBank, getCardBank,
@@ -73,8 +57,6 @@ import {
   setAddBalanceData, getAddBalanceData,
   setAdminBalanceTarget, getAdminBalanceTarget,
   setAdminMessageTarget, getAdminMessageTarget,
-  saveUserApiCredentials, getUserApiCredentials,
-  saveUserSession, getUserSession, setClockEnabled, getClockEnabled,
   setAdminTicketTarget, getAdminTicketTarget,
   getTicketsNeedingReminder, markTicketReminded,
   getTokenHourlyCost, setTokenHourlyCost, getActiveTokenCount,
@@ -89,9 +71,6 @@ const ADMIN_IDS           = (process.env["ADMIN_IDS"] || "")
 const REMINDER_HOURS      = parseInt(process.env["TICKET_REMINDER_HOURS"] ?? "2", 10);
 const REMINDER_THRESHOLD  = REMINDER_HOURS * 60 * 60 * 1000;
 const CHECK_INTERVAL_MS   = 30 * 60 * 1000;
-const SHARED_TG_API_ID    = parseInt(process.env["TG_API_ID"] ?? "0", 10);
-const SHARED_TG_API_HASH  = process.env["TG_API_HASH"] ?? "";
-const pendingLoginPhones  = new Map<number, string>();
 
 if (!BOT_TOKEN) throw new Error("TELEGRAM_BOT_TOKEN is required");
 
@@ -333,8 +312,6 @@ bot.onText(/\/start(.*)/, async (msg, match) => {
 
     await delMsg(chatId, msg.message_id);
     clearAllPending(userId);
-    await cancelTgSession(userId);
-    cancelUserbotAuth(userId);
     await removeReplyKeyboard(chatId);
 
     let referredBy: number | undefined;
@@ -385,8 +362,6 @@ bot.on("callback_query", async (query) => {
     const nav = data.replace("nav:", "");
 
     if (nav === "back") {
-      await cancelTgSession(userId);
-      cancelUserbotAuth(userId);
       if (isAdmin(userId)) {
         const fromManage = isPendingAdminManage(userId);
         clearAllPending(userId);
@@ -431,67 +406,6 @@ bot.on("callback_query", async (query) => {
       } else {
         await sendPanel(chatId, USER_OPEN_TICKET(ticket.id, ticket.createdAt, ticket.messages), { parse_mode: "Markdown", reply_markup: userMainKeyboard() });
       }
-      return;
-    }
-    if (nav === "token") {
-      if (await isUserActivated(userId)) {
-        const creds = await getUserApiCredentials(userId);
-        await sendPanel(chatId, ACTIVATED_SERVICES_MESSAGE(creds.tgApiId, creds.tgApiHash), { parse_mode: "Markdown", reply_markup: activatedServicesKeyboard(!!creds.tgApiId) });
-        return;
-      }
-      setPending(userId, "tokenEntry");
-      await sendPanel(chatId, TOKEN_SECTION_MESSAGE(), { parse_mode: "Markdown", reply_markup: cancelKeyboard() });
-      return;
-    }
-    if (nav === "telegram_login") {
-      const creds = await getUserApiCredentials(userId);
-      if (creds.tgApiId && creds.tgApiHash) {
-        await sendPanel(chatId, TELEGRAM_LOGIN_SUCCESS(creds.tgApiId, creds.tgApiHash), { parse_mode: "Markdown", reply_markup: activatedServicesKeyboard(true) });
-        return;
-      }
-      await sendPanel(chatId, TELEGRAM_LOGIN_PROMPT(), { parse_mode: "Markdown", reply_markup: cancelKeyboard() });
-      await bot.sendMessage(chatId, "📱 شماره تلفن خود را به اشتراک بگذارید:", { reply_markup: sharePhoneKeyboard() });
-      setPending(userId, "telegramPhone");
-      return;
-    }
-    if (nav === "clock") {
-      const creds = await getUserApiCredentials(userId);
-      if (!creds.tgApiId || !creds.tgApiHash || !creds.phoneNumber) {
-        await sendPanel(chatId, ACTIVATED_SERVICES_MESSAGE(creds.tgApiId, creds.tgApiHash), { parse_mode: "Markdown", reply_markup: activatedServicesKeyboard(!!creds.tgApiId) });
-        return;
-      }
-      const session = await getUserSession(userId);
-      const clockEnabled = await getClockEnabled(userId);
-      if (!session) {
-        await sendPanel(chatId, CLOCK_AUTH_PROMPT(creds.phoneNumber), { parse_mode: "Markdown", reply_markup: cancelKeyboard() });
-        const authResult = await initiateUserbotAuth(userId, creds.tgApiId, creds.tgApiHash, creds.phoneNumber);
-        if (authResult === "error") {
-          await sendPanel(chatId, CLOCK_AUTH_ERROR(), { parse_mode: "Markdown", reply_markup: activatedServicesKeyboard(true) });
-          return;
-        }
-        setPending(userId, "userbotCode");
-        await sendPanel(chatId, CLOCK_AUTH_CODE_PROMPT(), { parse_mode: "Markdown", reply_markup: cancelKeyboard() });
-        return;
-      }
-      await sendPanel(chatId, CLOCK_PANEL_MESSAGE(clockEnabled), { parse_mode: "Markdown", reply_markup: clockKeyboard(clockEnabled) });
-      return;
-    }
-    if (nav === "clock_on") {
-      const creds = await getUserApiCredentials(userId);
-      const session = await getUserSession(userId);
-      if (!session || !creds.tgApiId || !creds.tgApiHash) {
-        await sendPanel(chatId, ACTIVATED_SERVICES_MESSAGE(creds.tgApiId, creds.tgApiHash), { parse_mode: "Markdown", reply_markup: activatedServicesKeyboard(!!creds.tgApiId) });
-        return;
-      }
-      await setClockEnabled(userId, true);
-      startClockJob(userId, creds.tgApiId, creds.tgApiHash, session);
-      await sendPanel(chatId, CLOCK_PANEL_MESSAGE(true), { parse_mode: "Markdown", reply_markup: clockKeyboard(true) });
-      return;
-    }
-    if (nav === "clock_off") {
-      stopClockJob(userId);
-      await setClockEnabled(userId, false);
-      await sendPanel(chatId, CLOCK_PANEL_MESSAGE(false), { parse_mode: "Markdown", reply_markup: clockKeyboard(false) });
       return;
     }
     if (nav === "add_balance") {
@@ -798,7 +712,7 @@ bot.on("callback_query", async (query) => {
 
 // ── Messages ──────────────────────────────────────────────────────────────────
 bot.on("message", async (msg) => {
-  if (!msg.from || msg.text?.startsWith("/") || msg.contact) return;
+  if (!msg.from || msg.text?.startsWith("/")) return;
 
   try {
     const chatId    = msg.chat.id;
@@ -989,23 +903,6 @@ bot.on("message", async (msg) => {
     }
 
     // ── کاربران عادی — pending states ─────────────────────────────────────
-    if (isPending(userId, "tokenEntry")) {
-      clearAllPending(userId);
-      if (await isUserActivated(userId)) {
-        const creds = await getUserApiCredentials(userId);
-        await sendPanel(chatId, ACTIVATED_SERVICES_MESSAGE(creds.tgApiId, creds.tgApiHash), { parse_mode: "Markdown", reply_markup: activatedServicesKeyboard(!!creds.tgApiId) });
-        return;
-      }
-      const result = await validateAndUseToken(text, userId);
-      if (result.valid) {
-        await sendPanel(chatId, TOKEN_SUCCESS_MESSAGE(firstName), { parse_mode: "Markdown", reply_markup: activatedServicesKeyboard(false) });
-      } else {
-        const errMsg = result.reason === "already_used" ? TOKEN_ALREADY_USED_MESSAGE() : TOKEN_INVALID_MESSAGE();
-        await sendPanel(chatId, errMsg, { parse_mode: "Markdown", reply_markup: cancelKeyboard() });
-        setPending(userId, "tokenEntry");
-      }
-      return;
-    }
     if (isPending(userId, "support")) {
       clearAllPending(userId);
       const user = await getUser(userId);
@@ -1059,73 +956,10 @@ bot.on("message", async (msg) => {
       return;
     }
 
-    if (isPending(userId, "telegramCode")) {
-      const code = text.trim().replace(/\s+/g, "");
-      if (!/^\d{4,8}$/.test(code)) {
-        await sendPanel(chatId, TELEGRAM_CODE_INVALID(), { parse_mode: "Markdown", reply_markup: cancelKeyboard() });
-        setPending(userId, "telegramCode");
-        return;
-      }
-      clearAllPending(userId);
-      await sendPanel(chatId, "⏳ *در حال پردازش...*\n\nلطفاً چند لحظه صبر کنید.", { parse_mode: "Markdown", reply_markup: cancelKeyboard() });
-      const tgResult = await submitVerificationCode(userId, code);
-      if (tgResult === "invalid_code") {
-        await sendPanel(chatId, TELEGRAM_CODE_INVALID(), { parse_mode: "Markdown", reply_markup: cancelKeyboard() });
-        setPending(userId, "telegramCode");
-      } else if (tgResult === "error") {
-        await removeReplyKeyboard(chatId);
-        await sendPanel(chatId, TELEGRAM_LOGIN_ERROR(), { parse_mode: "Markdown", reply_markup: activatedServicesKeyboard(false) });
-      } else {
-        const creds = await getUserApiCredentials(userId);
-        await saveUserApiCredentials(userId, creds.phoneNumber ?? "", tgResult.apiId, tgResult.apiHash);
-        await removeReplyKeyboard(chatId);
-        await sendPanel(chatId, TELEGRAM_LOGIN_SUCCESS(tgResult.apiId, tgResult.apiHash), { parse_mode: "Markdown", reply_markup: activatedServicesKeyboard(true) });
-      }
-      return;
-    }
-
-    if (isPending(userId, "userbotCode")) {
-      const code = text.trim().replace(/\s+/g, "");
-      if (!/^\d{4,8}$/.test(code)) {
-        await sendPanel(chatId, CLOCK_AUTH_CODE_INVALID(), { parse_mode: "Markdown", reply_markup: cancelKeyboard() });
-        setPending(userId, "userbotCode");
-        return;
-      }
-      clearAllPending(userId);
-      await sendPanel(chatId, "⏳ *در حال اتصال...*\n\nلطفاً چند لحظه صبر کنید.", { parse_mode: "Markdown", reply_markup: cancelKeyboard() });
-      const result = await confirmUserbotAuth(userId, code);
-      const creds = await getUserApiCredentials(userId);
-      if (result === "invalid_code") {
-        await sendPanel(chatId, CLOCK_AUTH_CODE_INVALID(), { parse_mode: "Markdown", reply_markup: cancelKeyboard() });
-        setPending(userId, "userbotCode");
-      } else if (result === "ok") {
-        await sendPanel(chatId, CLOCK_AUTH_SUCCESS(), { parse_mode: "Markdown", reply_markup: clockKeyboard(false) });
-      } else {
-        await sendPanel(chatId, CLOCK_AUTH_ERROR(), { parse_mode: "Markdown", reply_markup: activatedServicesKeyboard(!!creds.tgApiId) });
-      }
-      return;
-    }
-
     await sendMainMenu(chatId, firstName);
   } catch (err) { logger.error({ err }, "message handler error"); }
 });
 
-// ── Contact sharing ───────────────────────────────────────────────────────────
-bot.on("contact", async (msg) => {
-  try {
-    const chatId    = msg.chat.id;
-    const userId    = msg.from!.id;
-    const firstName = msg.from!.first_name || "کاربر";
-    await delMsg(chatId, msg.message_id);
-    if (!isPending(userId, "telegramPhone")) {
-      await sendMainMenu(chatId, firstName);
-      return;
-    }
-    clearAllPending(userId);
-    let phone = (msg.contact!.phone_number ?? "").replace(/[^+\d]/g, "");
-    if (!phone.startsWith("+")) phone = "+" + phone;
-    await removeReplyKeyboard(chatId);
-    await sendPanel(chatId, TELEGRAM_PHONE_RECEIVED(phone), { parse_mode: "Markdown", reply_markup: cancelKeyboard() });
     const loginResult = await startPhoneLogin(userId, phone);
     if (loginResult === "error") {
       await sendPanel(chatId, TELEGRAM_PHONE_ERROR(), { parse_mode: "Markdown", reply_markup: activatedServicesKeyboard(false) });
