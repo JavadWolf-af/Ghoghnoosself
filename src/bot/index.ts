@@ -54,8 +54,6 @@ import {
   TELEGRAM_LOGIN_ERROR,
   TELEGRAM_CODE_INVALID,
   TELEGRAM_PHONE_ERROR,
-  TELEGRAM_LOGIN_PHONE_PROMPT,
-  TELEGRAM_LOGIN_CODE_PROMPT,
   CLOCK_PANEL_MESSAGE, CLOCK_AUTH_PROMPT, CLOCK_AUTH_CODE_PROMPT,
   CLOCK_AUTH_CODE_INVALID, CLOCK_AUTH_SUCCESS, CLOCK_AUTH_ERROR,
 } from "./messages";
@@ -89,9 +87,6 @@ const ADMIN_IDS           = (process.env["ADMIN_IDS"] || "")
 const REMINDER_HOURS      = parseInt(process.env["TICKET_REMINDER_HOURS"] ?? "2", 10);
 const REMINDER_THRESHOLD  = REMINDER_HOURS * 60 * 60 * 1000;
 const CHECK_INTERVAL_MS   = 30 * 60 * 1000;
-const SHARED_TG_API_ID    = parseInt(process.env["TG_API_ID"] ?? "0", 10);
-const SHARED_TG_API_HASH  = process.env["TG_API_HASH"] ?? "";
-const pendingLoginPhones  = new Map<number, string>();
 
 if (!BOT_TOKEN) throw new Error("TELEGRAM_BOT_TOKEN is required");
 
