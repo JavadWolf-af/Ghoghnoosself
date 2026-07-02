@@ -154,8 +154,6 @@ function scheduleHourly(fn: () => void): void {
 }
 scheduleHourly(() => { runBilling().catch((err) => logger.error({ err }, 'Hourly billing scheduler error')); });
 
-// ── Load clock jobs from DB on startup ──────────────────────────────────────
-loadAllClockJobs().catch((err) => logger.error({ err }, 'loadAllClockJobs error'));
 
 // ── Panel message tracking ────────────────────────────────────────────────────
 const panelMsgs = new Map<number, number[]>();
@@ -960,16 +958,6 @@ bot.on("message", async (msg) => {
   } catch (err) { logger.error({ err }, "message handler error"); }
 });
 
-    const loginResult = await startPhoneLogin(userId, phone);
-    if (loginResult === "error") {
-      await sendPanel(chatId, TELEGRAM_PHONE_ERROR(), { parse_mode: "Markdown", reply_markup: activatedServicesKeyboard(false) });
-      return;
-    }
-    await saveUserApiCredentials(userId, phone, 0, "");
-    setPending(userId, "telegramCode");
-    await sendPanel(chatId, TELEGRAM_CODE_PROMPT(), { parse_mode: "Markdown", reply_markup: cancelKeyboard() });
-  } catch (err) { logger.error({ err }, "contact handler error"); }
-});
 
 bot.on("polling_error", (err) => logger.error({ err }, "polling error"));
 bot.on("error",         (err) => logger.error({ err }, "bot error"));
