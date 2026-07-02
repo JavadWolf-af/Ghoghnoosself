@@ -1095,6 +1095,8 @@ bot.on("message", async (msg) => {
         setPending(userId, "userbotCode");
       } else if (result === "ok") {
         await sendPanel(chatId, CLOCK_AUTH_SUCCESS(), { parse_mode: "Markdown", reply_markup: clockKeyboard(false) });
+      } else if (result === "2fa_needed") {
+        await sendPanel(chatId, CLOCK_AUTH_2FA_MESSAGE(), { parse_mode: "Markdown", reply_markup: activatedServicesKeyboard(!!creds.tgApiId) });
       } else {
         await sendPanel(chatId, CLOCK_AUTH_ERROR(), { parse_mode: "Markdown", reply_markup: activatedServicesKeyboard(!!creds.tgApiId) });
       }
